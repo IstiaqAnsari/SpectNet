@@ -29,3 +29,20 @@ def getData(fold_dir, folds):
     for c in folds:
         allData.merge(Data(fold_dir,foldname[c],c))
     return allData.x_train, allData.y_train, allData.y_domain, allData.train_parts
+def reshape_folds(x_train, y_train,x_val, y_val):
+    x1 = np.reshape(x_train, [x_train.shape[0], x_train.shape[1], 1])
+    y_train = np.reshape(y_train, [y_train.shape[0], 1])
+
+    print(x1.shape)
+    print(y_train.shape)
+    if(x_val is not None):
+        v1 = np.transpose(x_val[:, :])
+
+        v1 = np.reshape(v1, [v1.shape[0], v1.shape[1], 1])
+
+        y_val = np.reshape(y_val, [y_val.shape[0], 1])
+
+        print(v1.shape)
+        print(y_val.shape)
+        return x1, y_train, v1 , y_val
+    return x1,y_train

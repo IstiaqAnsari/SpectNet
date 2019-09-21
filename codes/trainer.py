@@ -6,7 +6,7 @@ from __future__ import print_function, division, absolute_import
 # set_session(tf.Session(config=config))
 # from clr_callback import CyclicLR
 # import dill
-from dbt_dann_AudioDataGenerator import BalancedAudioDataGenerator
+from BalancedDannAudioDataGenerator import BalancedAudioDataGenerator
 import os
 from scipy.io import loadmat
 import numpy as np
@@ -32,12 +32,14 @@ from keras import backend as K
 from keras.utils import plot_model
 from custom_layers import Conv1D_zerophase_linear, Conv1D_linearphase, Conv1D_zerophase,\
     DCT1D, Conv1D_gammatone, Conv1D_linearphaseType
-from dann_heartnet_v1 import log_macc, write_meta, compute_weight, reshape_folds, results_log
+from dann_heartnet_v1 import log_macc, write_meta, compute_weight, results_log
+from dataLoader import reshape_folds
 from sklearn.metrics import confusion_matrix
 from keras.utils import to_categorical
 import matplotlib.pyplot as plt
 import seaborn as sns
 from Gradient_Reverse_Layer import GradientReversal
+import dataLoader
 sns.set()
 
 def branch(input_tensor,num_filt,kernel_size,random_seed,padding,bias,maxnorm,l2_reg,
@@ -71,7 +73,7 @@ def branch(input_tensor,num_filt,kernel_size,random_seed,padding,bias,maxnorm,l2
 
 def heartnet(load_path,activation_function='relu', bn_momentum=0.99, bias=False, dropout_rate=0.5, dropout_rate_dense=0.0,
              eps=1.1e-5, kernel_size=5, l2_reg=0.0, l2_reg_dense=0.0,lr=0.0012843784, lr_decay=0.0001132885, maxnorm=10000.,
-             padding='valid', random_seed=1, subsam=2, num_filt=(8, 4), num_dense=20,FIR_train=False,trainable=True,type=1):
+             padding='valid', random_seed=1, subsam=2, num_filt=(8, 4), num_dense=20,FIR_train=False,trainable=True,type=1,num_class=2, num_class_domain=1):
     
     #num_dense = 20 default 
     input = Input(shape=(2500, 1))
@@ -159,7 +161,7 @@ def heartnet(load_path,activation_function='relu', bn_momentum=0.99, bias=False,
                    use_bias=bias,
                    kernel_constraint=max_norm(maxnorm),
                    kernel_regularizer=l2(l2_reg_dense))(dann_in)   
-    dsc = Dense(6, activation='softmax', name = "domain")(dsc)          
+    dsc = Dense(num_class_domain, activation='softmax', name = "domain")(dsc)          
     merged = Dense(num_dense,
                    activation=activation_function,
                    kernel_initializer=initializers.he_normal(seed=random_seed),
@@ -169,7 +171,7 @@ def heartnet(load_path,activation_function='relu', bn_momentum=0.99, bias=False,
     # merged = BatchNormalization(epsilon=eps,momentum=bn_momentum,axis=-1) (merged)
     # merged = Activation(activation_function)(merged)
     #merged = Dropout(rate=dropout_rate_dense, seed=random_seed)(merged)
-    merged = Dense(2, activation='softmax', name="class")(merged)
+    merged = Dense(num_class, activation='softmax', name="class")(merged)
 
     model = Model(inputs=input, outputs=[merged,dsc])
 
@@ -287,10 +289,10 @@ if __name__ == '__main__':
         type = type
 
 
-        model_dir = '../../models_dbt_dann/'
-        fold_dir = '../../feature/potes_1DCNN/balancedCV/folds/folds_sep_all/'
+        model_dir = '../../Adversarial Heart Sound Results/models/'
+        fold_dir = '../../feature/potes_1DCNN/balancedCV/folds/folds_phys_compare_pascal/'
         log_name = foldname + ' ' + str(datetime.now())
-        log_dir = '../../logs/dbt_dann_abcdef/'
+        log_dir = '../../Adversarial Heart Sound Results/logs/'
         if not os.path.exists(model_dir + log_name):
             os.makedirs(model_dir + log_name)
         checkpoint_name = model_dir + log_name + "/" + 'weights.{epoch:04d}-{val_class_acc:.4f}.hdf5'
@@ -335,22 +337,25 @@ if __name__ == '__main__':
         ############## Importing data ############
 
         
-        train_domains = 
-        test_domains = 
-        test_split = 
+        train_domains = 'abcd'
+        test_domains = 'fgi'
+        test_split = 0
 
         num_class_domain = len(set(train_domains + test_domains))
         num_class = 2
 
         x_train, y_train, y_domain, train_parts = dataLoader.getData(fold_dir,train_domains)
 
-        x_val, y_val, y_val, val_parts = dataLoader.getData()
+        x_val, y_val, y_valdom, val_parts = dataLoader.getData(fold_dir,test_domains)
 
 
+        #Create meta labels and domain labels
+        domainClass = [(cls,dfc) for cls in range(2) for dfc in train_domains]
+        meta_labels = [domainClass.index((cl,df)) for (cl,df) in zip(y_train,y_domain)]
 
 
-
-
+        y_domain = np.array([list(set(train_domains+test_domains)).index(lab) for lab in y_domain])
+        y_valdom = np.array([list(set(train_domains+test_domains)).index(lab) for lab in y_valdom])
 
 
 
@@ -372,13 +377,13 @@ if __name__ == '__main__':
 
         ################### Reshaping ############
 
-        x_train, y_train, x_val, y_val = reshape_folds(x_train, x_val, y_train, y_val)
-        y_train = to_categorical(y_train, num_classes=2)
-        domainY = to_categorical(domainY,num_classes=6)
-        y_val = to_categorical(y_val, num_classes=2)
-        valdomY = to_categorical(valdomY,num_classes=6)
+        x_train, y_train, x_val, y_val = reshape_folds(x_train, y_train,x_val, y_val)
+        y_train = to_categorical(y_train, num_classes=num_class)
+        y_domain = to_categorical(y_domain,num_classes=num_class_domain)
+        y_val = to_categorical(y_val, num_classes=num_class)
+        y_valdom = to_categorical(y_valdom,num_classes=num_class_domain)
 
-        print("Train  files ", y_train.shape, "  Domain ", domainY.shape)
+        print("Train  files ", y_train.shape, "  Domain ", y_domain.shape)
         ############### Write metadata for embedding visualizer ############
 
         # metadata_file = write_meta(y_val,log_dir)
@@ -387,7 +392,7 @@ if __name__ == '__main__':
 
         model = heartnet(load_path,activation_function, bn_momentum, bias, dropout_rate, dropout_rate_dense,
                          eps, kernel_size, l2_reg, l2_reg_dense, lr, lr_decay, maxnorm,
-                         padding, random_seed, subsam, num_filt, num_dense, FIR_train, trainable, type)
+                         padding, random_seed, subsam, num_filt, num_dense, FIR_train, trainable, type,num_class=num_class,num_class_domain=num_class_domain)
         model.summary()
         plot_model(model, to_file='model.png', show_shapes=True)
         model_json = model.to_json()
@@ -485,14 +490,14 @@ if __name__ == '__main__':
         #     # samplewise_center=True,
         #     # samplewise_std_normalization=True,
         # )
-        flow = datagen.flow(x_train, [y_train,domainY],
+        flow = datagen.flow(x_train, [y_train,y_domain],
                             meta_label=meta_labels,
                             batch_size=batch_size, shuffle=True,
                             seed=random_seed)
 
         model.fit_generator(flow,
-                            # steps_per_epoch=len(x_train) // batch_size,
-                            steps_per_epoch= sum(np.asarray(train_files) == train_files[0]) // flow.chunk_size,
+                            steps_per_epoch=len(x_train) // batch_size,
+                            #steps_per_epoch= sum(np.asarray(train_files) == train_files[0]) // flow.chunk_size,
                             # max_queue_size=20,
                             use_multiprocessing=False,
                             epochs=epochs,
@@ -501,7 +506,7 @@ if __name__ == '__main__':
                             callbacks=[modelcheckpnt,hprate,
                                        log_macc(val_parts, decision=decision,verbose=verbose,val_files=val_files),
                                        tensbd, csv_logger],
-                            validation_data=(x_val, [y_val,valdomY]),
+                            validation_data=(x_val, [y_val,y_valdom]),
                             initial_epoch=initial_epoch,
                             )
 
