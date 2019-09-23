@@ -18,182 +18,34 @@ import pandas as pd
 import tables,h5py
 from datetime import datetime
 import argparse
-from keras.layers import Input, Conv1D, MaxPooling1D, Dense, Dropout, Flatten, Activation, AveragePooling1D
-from keras import initializers
-from keras.layers.normalization import BatchNormalization
-from keras.layers.merge import Concatenate
-from keras.models import Model
-from keras.regularizers import l2
-from keras.constraints import max_norm
-from keras.optimizers import Adam, SGD # Nadam, Adamax
 from keras.callbacks import TensorBoard, Callback, ReduceLROnPlateau
 from keras.callbacks import LearningRateScheduler, ModelCheckpoint, CSVLogger
 from keras import backend as K
 from keras.utils import plot_model
-from custom_layers import Conv1D_zerophase_linear, Conv1D_linearphase, Conv1D_zerophase,\
-    DCT1D, Conv1D_gammatone, Conv1D_linearphaseType
+from Heartnet import heartnet 
 from dann_heartnet_v1 import log_macc, write_meta, compute_weight, results_log
 from dataLoader import reshape_folds
 from sklearn.metrics import confusion_matrix
 from keras.utils import to_categorical
 import matplotlib.pyplot as plt
 import seaborn as sns
-from Gradient_Reverse_Layer import GradientReversal
+
 import dataLoader
 sns.set()
-
-def branch(input_tensor,num_filt,kernel_size,random_seed,padding,bias,maxnorm,l2_reg,
-           eps,bn_momentum,activation_function,dropout_rate,subsam,trainable):
-
-    num_filt1, num_filt2 = num_filt
-    t = Conv1D(num_filt1, kernel_size=kernel_size,
-                kernel_initializer=initializers.he_normal(seed=random_seed),
-                padding=padding,
-                use_bias=bias,
-                kernel_constraint=max_norm(maxnorm),
-                trainable=trainable,
-                kernel_regularizer=l2(l2_reg))(input_tensor)
-    t = BatchNormalization(epsilon=eps, momentum=bn_momentum, axis=-1)(t)
-    t = Activation(activation_function)(t)
-    t = Dropout(rate=dropout_rate, seed=random_seed)(t)
-    t = MaxPooling1D(pool_size=subsam)(t)
-    t = Conv1D(num_filt2, kernel_size=kernel_size,
-               kernel_initializer=initializers.he_normal(seed=random_seed),
-               padding=padding,
-               use_bias=bias,
-               trainable=trainable,
-               kernel_constraint=max_norm(maxnorm),
-               kernel_regularizer=l2(l2_reg))(t)
-    t = BatchNormalization(epsilon=eps, momentum=bn_momentum, axis=-1)(t)
-    t = Activation(activation_function)(t)
-    t = Dropout(rate=dropout_rate, seed=random_seed)(t)
-    t = MaxPooling1D(pool_size=subsam)(t)
-    # t = Flatten()(t)
-    return t
-
-def heartnet(load_path,activation_function='relu', bn_momentum=0.99, bias=False, dropout_rate=0.5, dropout_rate_dense=0.0,
-             eps=1.1e-5, kernel_size=5, l2_reg=0.0, l2_reg_dense=0.0,lr=0.0012843784, lr_decay=0.0001132885, maxnorm=10000.,
-             padding='valid', random_seed=1, subsam=2, num_filt=(8, 4), num_dense=20,FIR_train=False,trainable=True,type=1,num_class=2, num_class_domain=1):
-    
-    #num_dense = 20 default 
-    input = Input(shape=(2500, 1))
-
-    coeff_path = '../../feature/filterbankcoeff60.mat'
-    coeff = tables.open_file(coeff_path)
-    b1 = coeff.root.b1[:]
-    b1 = np.hstack(b1)
-    b1 = np.reshape(b1, [b1.shape[0], 1, 1])
-
-    b2 = coeff.root.b2[:]
-    b2 = np.hstack(b2)
-    b2 = np.reshape(b2, [b2.shape[0], 1, 1])
-
-    b3 = coeff.root.b3[:]
-    b3 = np.hstack(b3)
-    b3 = np.reshape(b3, [b3.shape[0], 1, 1])
-
-    b4 = coeff.root.b4[:]
-    b4 = np.hstack(b4)
-    b4 = np.reshape(b4, [b4.shape[0], 1, 1])
-
-    ## Conv1D_linearphase
-
-    # input1 = Conv1D_linearphase(1 ,61, use_bias=False,
-    #                 # kernel_initializer=initializers.he_normal(random_seed),
-    #                 weights=[b1[30:]],
-    #                 padding='same',trainable=FIR_train)(input)
-    # input2 = Conv1D_linearphase(1, 61, use_bias=False,
-    #                 # kernel_initializer=initializers.he_normal(random_seed),
-    #                 weights=[b2[30:]],
-    #                 padding='same',trainable=FIR_train)(input)
-    # input3 = Conv1D_linearphase(1, 61, use_bias=False,
-    #                 # kernel_initializer=initializers.he_normal(random_seed),
-    #                 weights=[b3[30:]],
-    #                 padding='same',trainable=FIR_train)(input)
-    # input4 = Conv1D_linearphase(1, 61, use_bias=False,
-    #                 # kernel_initializer=initializers.he_normal(random_seed),
-    #                 weights=[b4[30:]],
-    #                 padding='same',trainable=FIR_train)(input)
-
-    ## Conv1D_linearphase Anti-Symmetric
-    #
-    input1 = Conv1D_linearphaseType(1 ,60, use_bias=False,
-                    # kernel_initializer=initializers.he_normal(random_seed),
-                    weights=[b1[31:]],
-                    padding='same',trainable=FIR_train, type = type)(input)
-    input2 = Conv1D_linearphaseType(1, 60, use_bias=False,
-                    # kernel_initializer=initializers.he_normal(random_seed),
-                    weights=[b2[31:]],
-                    padding='same',trainable=FIR_train, type = type)(input)
-    input3 = Conv1D_linearphaseType(1, 60, use_bias=False,
-                    # kernel_initializer=initializers.he_normal(random_seed),
-                    weights=[b3[31:]],
-                    padding='same',trainable=FIR_train, type = type)(input)
-    input4 = Conv1D_linearphaseType(1, 60, use_bias=False,
-                    # kernel_initializer=initializers.he_normal(random_seed),
-                    weights=[b4[31:]],
-                    padding='same',trainable=FIR_train, type = type)(input)
-
-    #Conv1D_gammatone
-
-    # input1 = Conv1D_gammatone(kernel_size=81,filters=1,fsHz=1000,use_bias=False,padding='same')(input)
-    # input2 = Conv1D_gammatone(kernel_size=81,filters=1,fsHz=1000,use_bias=False,padding='same')(input)
-    # input3 = Conv1D_gammatone(kernel_size=81,filters=1,fsHz=1000,use_bias=False,padding='same')(input)
-    # input4 = Conv1D_gammatone(kernel_size=81,filters=1,fsHz=1000,use_bias=False,padding='same')(input)
-
-    t1 = branch(input1,num_filt,kernel_size,random_seed,padding,bias,maxnorm,l2_reg,
-           eps,bn_momentum,activation_function,dropout_rate,subsam,trainable)
-    t2 = branch(input2,num_filt,kernel_size,random_seed,padding,bias,maxnorm,l2_reg,
-           eps,bn_momentum,activation_function,dropout_rate,subsam,trainable)
-    t3 = branch(input3,num_filt,kernel_size,random_seed,padding,bias,maxnorm,l2_reg,
-           eps,bn_momentum,activation_function,dropout_rate,subsam,trainable)
-    t4 = branch(input4,num_filt,kernel_size,random_seed,padding,bias,maxnorm,l2_reg,
-           eps,bn_momentum,activation_function,dropout_rate,subsam,trainable)
-
-    merged = Concatenate(axis=-1)([t1, t2, t3, t4])
-    # merged = DCT1D()(merged)
-    merged = Flatten()(merged)
-    # discriminator
-    dann_in = GradientReversal(hp_lambda=.01,name='grl')(merged)
-    dsc = Dense(50,
-                   activation=activation_function,
-                   kernel_initializer=initializers.he_normal(seed=random_seed),
-                   use_bias=bias,
-                   kernel_constraint=max_norm(maxnorm),
-                   kernel_regularizer=l2(l2_reg_dense))(dann_in)   
-    dsc = Dense(num_class_domain, activation='softmax', name = "domain")(dsc)          
-    merged = Dense(num_dense,
-                   activation=activation_function,
-                   kernel_initializer=initializers.he_normal(seed=random_seed),
-                   use_bias=bias,
-                   kernel_constraint=max_norm(maxnorm),
-                   kernel_regularizer=l2(l2_reg_dense))(merged)
-    # merged = BatchNormalization(epsilon=eps,momentum=bn_momentum,axis=-1) (merged)
-    # merged = Activation(activation_function)(merged)
-    #merged = Dropout(rate=dropout_rate_dense, seed=random_seed)(merged)
-    merged = Dense(num_class, activation='softmax', name="class")(merged)
-
-    model = Model(inputs=input, outputs=[merged,dsc])
-
-    #if load_path:  # If path for loading model was specified
-    #model.load_weights(filepath='../../models_dbt_dann/fold_a_gt 2019-09-09 16:53:52.063276/weights.0041-0.6907.hdf5', by_name=True)
-    # models/fold_a_gt 2019-09-04 17:36:52.860817/weights.0200-0.7135.hdf5
-    
-    #if optim=='Adam':
-    #    opt = Adam(lr=lr, decay=lr_decay)
-    #else:
-    opt = SGD(lr=lr,decay=lr_decay)
-
-    model.compile(optimizer=opt, loss={'class':'categorical_crossentropy','domain':'categorical_crossentropy'}, metrics=['accuracy'])
-    return model
 
 if __name__ == '__main__':
     try:
         ########## Parser for arguments (foldname, random_seed, load_path, epochs, batch_size)
         parser = argparse.ArgumentParser(description='Specify fold to process')
-        parser.add_argument("fold",
+        parser.add_argument("test_domains",
                             help="which fold to use from balanced folds generated in /media/taufiq/Data/"
                                  "heart_sound/feature/potes_1DCNN/balancedCV/folds/")
+        parser.add_argument("--train_domains",
+                            help = "trainer domain ")
+        parser.add_argument("--tune", type=int,
+                            help="Tuner")
+        parser.add_argument("--dann",type=float,
+                            help = "if given dann is activated else zero")
         parser.add_argument("--seed", type=int,
                             help="Random seed for the random number generator (defaults to 1)")
         parser.add_argument("--loadmodel",
@@ -216,8 +68,27 @@ if __name__ == '__main__':
 
 
         args = parser.parse_args()
-        print("%s selected" % (args.fold))
-        foldname = args.fold
+        if args.tune:
+            tune = args.tune
+        else:
+            tune = 0
+
+        
+        domain_list = 'abcdefghi'
+        test_domains = args.test_domains
+        train_domains = domain_list
+        for c in test_domains:
+            train_domains = train_domains.replace(c,"")
+        if args.train_domains:
+            train_domains = args.train_domains
+        if(tune==0):
+            foldname = train_domains+"_"+test_domains
+        else:
+            foldname = train_domains+"_"+test_domains+"_tune_"+tune
+        print("%s selected for training" % (train_domains))
+        print("%s selected for validation" % (test_domains))
+        print(foldname)
+
         optim = 'Adam'
         if args.optim:
             optim = args.optim
@@ -275,7 +146,10 @@ if __name__ == '__main__':
             lr = args.lr
         else:
             lr = 0.0012843784
-
+        if args.dann:
+            hp_lambda = args.dann
+        else:
+            hp_lambda = 0
 
         #########################################################
 
@@ -293,6 +167,10 @@ if __name__ == '__main__':
         fold_dir = '../../feature/potes_1DCNN/balancedCV/folds/folds_phys_compare_pascal/'
         log_name = foldname + ' ' + str(datetime.now())
         log_dir = '../../Adversarial Heart Sound Results/logs/'
+        if(args.dann):
+            if(args.dann>0):
+                model_dir = model_dir + 'dann/'
+                log_dir = log_dir + 'dann/'
         if not os.path.exists(model_dir + log_name):
             os.makedirs(model_dir + log_name)
         checkpoint_name = model_dir + log_name + "/" + 'weights.{epoch:04d}-{val_class_acc:.4f}.hdf5'
@@ -337,71 +215,38 @@ if __name__ == '__main__':
         ############## Importing data ############
 
         
-        train_domains = 'abcd'
-        test_domains = 'fgi'
         test_split = 0
 
         num_class_domain = len(set(train_domains + test_domains))
         num_class = 2
 
         x_train, y_train, y_domain, train_parts = dataLoader.getData(fold_dir,train_domains)
-
-        x_val, y_val, y_valdom, val_parts = dataLoader.getData(fold_dir,test_domains)
-
-
+        x_val, y_val, val_domain, val_parts = dataLoader.getData(fold_dir,test_domains)
+        val_files = val_domain
         #Create meta labels and domain labels
         domainClass = [(cls,dfc) for cls in range(2) for dfc in train_domains]
         meta_labels = [domainClass.index((cl,df)) for (cl,df) in zip(y_train,y_domain)]
 
-
         y_domain = np.array([list(set(train_domains+test_domains)).index(lab) for lab in y_domain])
-        y_valdom = np.array([list(set(train_domains+test_domains)).index(lab) for lab in y_valdom])
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+        val_domain = np.array([list(set(train_domains+test_domains)).index(lab) for lab in val_domain])
 
         ################### Reshaping ############
-
-        x_train, y_train, x_val, y_val = reshape_folds(x_train, y_train,x_val, y_val)
+        [x_train, x_val], [y_train,y_domain,y_val] = reshape_folds([x_train,x_val],[y_train,y_domain,y_val])
         y_train = to_categorical(y_train, num_classes=num_class)
         y_domain = to_categorical(y_domain,num_classes=num_class_domain)
         y_val = to_categorical(y_val, num_classes=num_class)
-        y_valdom = to_categorical(y_valdom,num_classes=num_class_domain)
-
+        val_domain = to_categorical(val_domain,num_classes=num_class_domain)
         print("Train  files ", y_train.shape, "  Domain ", y_domain.shape)
-        ############### Write metadata for embedding visualizer ############
-
-        # metadata_file = write_meta(y_val,log_dir)
-
+        
         ############## Create a model ############
-
         model = heartnet(load_path,activation_function, bn_momentum, bias, dropout_rate, dropout_rate_dense,
                          eps, kernel_size, l2_reg, l2_reg_dense, lr, lr_decay, maxnorm,
-                         padding, random_seed, subsam, num_filt, num_dense, FIR_train, trainable, type,num_class=num_class,num_class_domain=num_class_domain)
+                         padding, random_seed, subsam, num_filt, num_dense, FIR_train, trainable, type,num_class=num_class,num_class_domain=num_class_domain,hp_lambda=hp_lambda)
         model.summary()
         plot_model(model, to_file='model.png', show_shapes=True)
         model_json = model.to_json()
         with open(model_dir + log_name+"/model.json", "w") as json_file:
             json_file.write(model_json)
-        # embedding_layer_names =set(layer.name
-        #                     for layer in model.layers
-        #                     if (layer.name.startswith('dense_')))
-        # print(embedding_layer_names)
 
         ####### Define Callbacks ######
 
@@ -418,7 +263,6 @@ if __name__ == '__main__':
         csv_logger = CSVLogger(log_dir + log_name + '/training.csv')
         ######### Scheduler #################
         ## learning rate 
-
         def step_decay(epoch):
             
             lr0 = .00128437
@@ -428,10 +272,8 @@ if __name__ == '__main__':
             p = epoch/epochs
             lrate = lr0/math.pow((1+a*p),b)
             return lrate
-        lrate = LearningRateScheduler(step_decay)
-
+        lrate = LearningRateScheduler(step_decay,verbose = 1)
         # Lambda for gradient reversal layer
-        hp_lambda = 0.01
         def f_hp_decay(epoch):
             if epoch<200:
                 return np.float32(hp_lambda)
@@ -440,8 +282,6 @@ if __name__ == '__main__':
             lam =  (2 / (1 + 1*(math.e ** (- gamma * p)))) - 1+.01  # 3 porjonto jaabe
             # hp_lambda = hp_lambda * (params['hp_decay_const'] ** global_epoch_counter)
             return np.float32(lam)
-
-
         class hpRateScheduler(Callback):
             """Learning rate scheduler.
             # Arguments
@@ -450,14 +290,11 @@ if __name__ == '__main__':
                     and returns a new learning rate as output (float).
                 verbose: int. 0: quiet, 1: update messages.
             """
-
             def __init__(self, schedule, verbose=0):
                 super(hpRateScheduler, self).__init__()
                 self.schedule = schedule
                 self.verbose = verbose
-
             def on_epoch_begin(self, epoch,logs=None):
-                
                 hp_lambda = self.schedule(epoch)
                 if not isinstance(hp_lambda, (float, np.float32, np.float64)):
                     raise ValueError('The output of the "schedule" function '
@@ -467,11 +304,17 @@ if __name__ == '__main__':
                 if self.verbose > 0:
                     print('\nEpoch %05d: HP setting hp_lambda '
                           'rate to %s.' % (epoch + 1, hp_lambda))
-
-        hprate = hpRateScheduler(f_hp_decay)
+        hprate = hpRateScheduler(f_hp_decay,verbose = 1)
+        class MyCallback(Callback):
+            def on_epoch_begin(self, epoch, logs=None):
+                lr = self.model.optimizer.lr
+                # If you want to apply decay.
+                decay = self.model.optimizer.decay
+                iterations = self.model.optimizer.iterations
+                lr_with_decay = lr / (1. + decay * K.cast(iterations, K.dtype(decay)))
+                print(epoch, " Setting Learning rate: " , K.eval(lr_with_decay))
+        trackLr = MyCallback()
         ######### Data Generator ############
-
-
         datagen = BalancedAudioDataGenerator(
                                      shift=.1,
                                      # roll_range=.1,
@@ -494,19 +337,18 @@ if __name__ == '__main__':
                             meta_label=meta_labels,
                             batch_size=batch_size, shuffle=True,
                             seed=random_seed)
-
         model.fit_generator(flow,
-                            steps_per_epoch=len(x_train) // batch_size,
-                            #steps_per_epoch= sum(np.asarray(train_files) == train_files[0]) // flow.chunk_size,
+                            #steps_per_epoch=len(x_train) // batch_size,
+                            steps_per_epoch=flow.steps_per_epoch,
                             # max_queue_size=20,
                             use_multiprocessing=False,
                             epochs=epochs,
                             verbose=verbose,
                             shuffle=True,
-                            callbacks=[modelcheckpnt,hprate,
+                            callbacks=[modelcheckpnt,hprate,trackLr,
                                        log_macc(val_parts, decision=decision,verbose=verbose,val_files=val_files),
                                        tensbd, csv_logger],
-                            validation_data=(x_val, [y_val,y_valdom]),
+                            validation_data=(x_val, [y_val,val_domain]),
                             initial_epoch=initial_epoch,
                             )
 

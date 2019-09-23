@@ -16,7 +16,8 @@ class DataMerge():
             self.x_train = np.concatenate((self.x_train,data.trainX),axis = 1)
             self.y_train = np.concatenate((self.y_train,data.trainY),axis = 0)
             self.y_domain = self.y_domain+data.domainY
-            self.train_parts = np.concatenate((self.train_parts,data.train_parts),axis = 0)            
+            if(data.train_parts is not None):
+                self.train_parts = np.concatenate((self.train_parts,data.train_parts),axis = 0)            
 
 def getData(fold_dir, folds):
     try:
@@ -29,20 +30,17 @@ def getData(fold_dir, folds):
     for c in folds:
         allData.merge(Data(fold_dir,foldname[c],c))
     return allData.x_train, allData.y_train, allData.y_domain, allData.train_parts
-def reshape_folds(x_train, y_train,x_val, y_val):
-    x1 = np.reshape(x_train, [x_train.shape[0], x_train.shape[1], 1])
-    y_train = np.reshape(y_train, [y_train.shape[0], 1])
+def reshape_folds(x, y):
+    x_train = []
+    for x1 in x:
+        x1 = np.transpose(x1[:, :])
+        x1 = np.reshape(x1, [x1.shape[0], x1.shape[1], 1])
+        x_train.append(x1)
+        print(x1.shape)
+    y_train = []
+    for y1 in y:
+        y1 = np.reshape(y1, [y1.shape[0], 1])
+        y_train.append(y1)
+        print(y1.shape)
 
-    print(x1.shape)
-    print(y_train.shape)
-    if(x_val is not None):
-        v1 = np.transpose(x_val[:, :])
-
-        v1 = np.reshape(v1, [v1.shape[0], v1.shape[1], 1])
-
-        y_val = np.reshape(y_val, [y_val.shape[0], 1])
-
-        print(v1.shape)
-        print(y_val.shape)
-        return x1, y_train, v1 , y_val
-    return x1,y_train
+    return x_train,y_train

@@ -1,4 +1,4 @@
-import matplotlib.pyplot as plt,h5py
+import matplotlib.pyplot as plt,h5py,numpy as np
 from collections import Counter
 
 class Data():
@@ -26,7 +26,26 @@ class Data():
         self.normal = Counter(self.trainY)[0]
         self.abnormal = Counter(self.trainY)[1]
         self.total = self.normal+self.abnormal
-        
+        if('fold_e' in f):
+            nn = ab = 0
+            idx = []
+            for x in self.trainY:
+                if x==0:
+                    if(nn<self.abnormal):
+                        idx.append(True)
+                        nn += 1
+                    else:idx.append(False);
+                else:
+                    if(ab<self.abnormal):
+                        idx.append(True)
+                        ab += 1
+                    else:idx.append(False);
+            self.trainY = self.trainY[idx]
+            self.trainX = np.transpose(np.transpose(self.trainX)[idx])
+            self.train_parts = None
+            self.total = nn+ab
+            self.domainY = self.domainY[:self.total]
+            self.normfiles, self.abnormfiles = nn,ab
     def parts(self):
         y = 0
         nn = 0

@@ -495,6 +495,7 @@ class _Iterator(object):
             self.exhaustion = [False] * len(np.unique(self.meta_label))
             self.labels = np.unique(self.meta_label)  # unique labels in y[target_label]
             self.chunk_size = int(batch_size / len(self.labels))
+            self.steps_per_epoch = max(np.bincount(meta_label))//self.chunk_size
             print('Chunk size selected as %d' % self.chunk_size)
             if not all(np.bincount(self.meta_label) >= self.chunk_size):
                 warnings.warn('Number of samples for label %s is smaller than chunk size %d' %
@@ -624,7 +625,6 @@ class _NumpyArrayIterator(_Iterator):
         if data_format is None:
             data_format = 'channels_last'
         self.x = np.asarray(x, dtype=K.floatx())
-
         if self.x.ndim != 3:
             raise ValueError('Input data in `NumpyArrayIterator` '
                              'should have rank 3. You passed an array '
@@ -823,7 +823,7 @@ class BalancedAudioDataGenerator(AudioDataGenerator):
         if meta_label is not None:
             warnings.warn('`meta_labels` specified, will use meta_labels instead of target_label')
             flag=0
-            if not len(meta_label)==len(y[target_label]):
+            if not all([len(meta_label)==len(lab) for lab in y]):
                 raise ValueError('length of `meta_label` should be equal to `y`')
         else:
             ## handle y type
