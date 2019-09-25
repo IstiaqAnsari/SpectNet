@@ -7,7 +7,7 @@ from __future__ import print_function, division, absolute_import
 # from clr_callback import CyclicLR
 # import dill
 from BalancedDannAudioDataGenerator import BalancedAudioDataGenerator
-import os
+import os,time
 from scipy.io import loadmat
 import numpy as np
 np.random.seed(1)
@@ -42,8 +42,8 @@ if __name__ == '__main__':
                                  "heart_sound/feature/potes_1DCNN/balancedCV/folds/")
         parser.add_argument("--train_domains",
                             help = "trainer domain ")
-        parser.add_argument("--tune", type=int,
-                            help="Tuner")
+        parser.add_argument("--tune", type=float,
+                            help="Tuner or data split test_split")
         parser.add_argument("--dann",type=float,
                             help = "if given dann is activated else zero")
         parser.add_argument("--seed", type=int,
@@ -69,9 +69,9 @@ if __name__ == '__main__':
 
         args = parser.parse_args()
         if args.tune:
-            tune = args.tune
+            test_split = args.tune
         else:
-            tune = 0
+            test_split = 0
 
         
         domain_list = 'abcdefghi'
@@ -81,10 +81,10 @@ if __name__ == '__main__':
             train_domains = train_domains.replace(c,"")
         if args.train_domains:
             train_domains = args.train_domains
-        if(tune==0):
+        if(test_split==0):
             foldname = train_domains+"_"+test_domains
         else:
-            foldname = train_domains+"_"+test_domains+"_tune_"+tune
+            foldname = train_domains+"_"+test_domains+"_tune_"+str(test_split)
         print("%s selected for training" % (train_domains))
         print("%s selected for validation" % (test_domains))
         print(foldname)
@@ -128,7 +128,7 @@ if __name__ == '__main__':
             verbose = args.verbose
             print("Verbosity level %d" % (verbose))
         else:
-            verbose = 2
+            verbose = 1
         if args.classweights:
             addweights = True
         else:
@@ -165,7 +165,12 @@ if __name__ == '__main__':
 
         model_dir = '../../Adversarial Heart Sound Results/models/'
         fold_dir = '../../feature/potes_1DCNN/balancedCV/folds/folds_phys_compare_pascal/'
-        log_name = foldname + ' ' + str(datetime.now())
+
+        if(test_split>0):
+            log_name = foldname +' Tuned '+str(int(test_split*100))+' '+ str(datetime.now())
+        else:
+            log_name = foldname + ' ' + str(datetime.now())
+
         log_dir = '../../Adversarial Heart Sound Results/logs/'
         if(args.dann):
             if(args.dann>0):
@@ -214,17 +219,18 @@ if __name__ == '__main__':
 
         ############## Importing data ############
 
-        
-        test_split = 0
-
         num_class_domain = len(set(train_domains + test_domains))
         num_class = 2
 
-        x_train, y_train, y_domain, train_parts = dataLoader.getData(fold_dir,train_domains)
-        x_val, y_val, val_domain, val_parts = dataLoader.getData(fold_dir,test_domains)
+        x_train, y_train, y_domain, train_parts,x_val, y_val, val_domain, val_parts = dataLoader.getData(fold_dir,train_domains,test_domains,test_split)
+
         val_files = val_domain
         #Create meta labels and domain labels
-        domainClass = [(cls,dfc) for cls in range(2) for dfc in train_domains]
+        domains = train_domains
+        if(test_split>0):
+            domains = domains + test_domains
+        domainClass = [(cls,dfc) for cls in range(2) for dfc in domains]
+
         meta_labels = [domainClass.index((cl,df)) for (cl,df) in zip(y_train,y_domain)]
 
         y_domain = np.array([list(set(train_domains+test_domains)).index(lab) for lab in y_domain])
@@ -314,6 +320,17 @@ if __name__ == '__main__':
                 lr_with_decay = lr / (1. + decay * K.cast(iterations, K.dtype(decay)))
                 print(epoch, " Setting Learning rate: " , K.eval(lr_with_decay))
         trackLr = MyCallback()
+        class TimeHistory(Callback):
+            def on_train_begin(self, logs={}):
+                self.times = []
+
+            def on_epoch_begin(self, epoch, logs={}):
+                self.epoch_time_start = time.time()
+
+            def on_epoch_end(self, epoch, logs={}):
+                self.times.append(time.time() - self.epoch_time_start)
+                print("Epoch Time : ",time.time() - self.epoch_time_start)
+        time_callback = TimeHistory()
         ######### Data Generator ############
         datagen = BalancedAudioDataGenerator(
                                      shift=.1,
@@ -345,7 +362,7 @@ if __name__ == '__main__':
                             epochs=epochs,
                             verbose=verbose,
                             shuffle=True,
-                            callbacks=[modelcheckpnt,hprate,trackLr,
+                            callbacks=[modelcheckpnt,hprate,trackLr,time_callback,
                                        log_macc(val_parts, decision=decision,verbose=verbose,val_files=val_files),
                                        tensbd, csv_logger],
                             validation_data=(x_val, [y_val,val_domain]),
