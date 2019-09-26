@@ -1,8 +1,8 @@
 import matplotlib.pyplot as plt,h5py,numpy as np
 from collections import Counter
-
 class Data():
     def __init__(self,path,f,n,severe = False,split=0):
+        
         if(split>=1 or split<0):
             print("make sure split follow  1<split<=0 ")
             raise ValueError
@@ -23,12 +23,19 @@ class Data():
         self.abnormal = Counter(self.trainY)[1]
         self.total = self.normal+self.abnormal
         if('fold_e' in f): self.processE()
-        if(f[:3]=='com'):self.processCompare(severe)
+        if(f[:3]=='com'):self.processCompare(severe) ### select severe files only
         else:
             self.trainY[self.trainY<0] = 0
-            if(split>0):self.split_data(split)
+        if(split>0):self.split_data(split)
         
     def split_data(self,split):
+        if(self.file[:3]=='com'):
+            self.valX = self.data['valX'][:]
+            self.valY = self.data['valY'][:][0]
+            self.valY[self.valY>0] = 1
+            self.val_parts = self.data['val_parts'][0].astype('int32')
+            self.valdomY = [self.dom]*self.valY.shape[0]
+            return
         taken = 0
         left = 0
         tmpX = None
@@ -62,17 +69,14 @@ class Data():
         self.valdomY = [self.dom]*self.valY.shape[0]
         del tmpX,tmpY,parts
     def processCompare(self,severe):
-        self.valX = self.data['valX'][:]
-        self.valY = self.data['valY'][:][0]
-        self.valY[self.valY>0] = 1
         if(severe):
             self.sevX = None
             self.sevY = self.trainY[self.trainY<2]
             self.sev_parts = []
             left = int(0)
-            for x in d.train_parts:
+            for x in self.train_parts:
                 x = int(x)
-                if(all([i==2 for i in d.trainY[left:x+left]])):
+                if(all([i==2 for i in self.trainY[left:x+left]])):
                     if(self.sevX is None):
                         self.sevX = self.trainX[:,left:x+left]
                     else: 
@@ -135,3 +139,12 @@ class Data():
         plt.title(self.dom)
     def value(self,val):
         return int(self.total*val/100)
+    def details(self):
+        if(self.trainX is  None):print("TrainX None/ ",end='')
+        if(self.trainY is  None):print("trainY None/ ",end='')
+        if(self.domainY is None):print("Dom Y/ ",end='')
+        if(self.train_parts is  None):print("train parts/ ")
+        if(self.valX is None):print("valX/ ",end='')
+        if(self.valY is None) :print("valY/ ",end='')
+        if(self.valdomY is None):print("Valdom/ ",end='')
+        if(self.val_parts is  None):print("val parts/ ")

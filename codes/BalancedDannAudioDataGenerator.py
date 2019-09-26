@@ -496,6 +496,8 @@ class _Iterator(object):
             self.labels = np.unique(self.meta_label)  # unique labels in y[target_label]
             self.chunk_size = int(batch_size / len(self.labels))
             self.steps_per_epoch = max(np.bincount(meta_label))//self.chunk_size
+            print(np.bincount(self.meta_label))
+            print(self.labels)
             print('Chunk size selected as %d' % self.chunk_size)
             if not all(np.bincount(self.meta_label) >= self.chunk_size):
                 warnings.warn('Number of samples for label %s is smaller than chunk size %d' %
