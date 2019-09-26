@@ -6,9 +6,11 @@ def showResults():
     idx = [(v.get()==1) for v in var]
     selected = list(np.array(log_names)[idx])
     print(selected)
-    res = ResultsComparison(selected)
-    res.show()
-    window.destroy()
+    if(len(selected)>0):
+        res = ResultsComparison(selected)
+        res.show()
+    else:
+         print("None selected ")   
 
 log_dir = '../../Adversarial Heart Sound Results/logs/'
 
