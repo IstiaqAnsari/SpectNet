@@ -201,7 +201,6 @@ if __name__ == '__main__':
         trainable = True
         decision = 'majority'  # Decision algorithm for inference over total recording ('majority','confidence','match')
 
-
         # lr =  0.0012843784 ## After bayesian optimization
 
         ###### lr_decay optimization ######
@@ -274,14 +273,17 @@ if __name__ == '__main__':
             lr0 = .00128437
             #print("learning rate , lr 0 ", lr, lr0)
             a = 1
-            b = 4
+            b = 1
             p = epoch/epochs
             lrate = lr0/math.pow((1+a*p),b)
             return lrate
         lrate = LearningRateScheduler(step_decay,verbose = 1)
         # Lambda for gradient reversal layer
         def f_hp_decay(epoch):
-            if epoch<200:
+            minEpoch = 100
+            if hp_lambda == 0:
+                return hp_lambda
+            if epoch<minEpoch:
                 return np.float32(hp_lambda)
             gamma =  1
             p = (epoch-200) / (epochs)
