@@ -17,15 +17,15 @@ class Data():
         self.valY = None
         self.valdomY = None
         self.val_parts = None
-        self.normfiles, self.abnormfiles = self.parts()
         self.domainY = [n]*self.trainY.shape[0]
+        if(f[:3]=='com'):self.processCompare(severe) ### select severe files only
+        else:
+            self.trainY[self.trainY<0] = 0   
         self.normal = Counter(self.trainY)[0]
         self.abnormal = Counter(self.trainY)[1]
         self.total = self.normal+self.abnormal
-        if('fold_e' in f): self.processE()
-        if(f[:3]=='com'):self.processCompare(severe) ### select severe files only
-        else:
-            self.trainY[self.trainY<0] = 0
+        self.normfiles, self.abnormfiles = self.parts() 
+        if('fold_e' in f):self.processE()
         if(split>0):self.split_data(split)
         
     def split_data(self,split):

@@ -8,6 +8,9 @@ class DataMerge():
         self.split = split
         self.x_train = self.y_train = self.y_domain = self.train_parts = None
         self.x_val = self.y_val = self.y_valdom = self.val_parts = None
+
+        #self.train_normal, self.train_abnormal, self.val_normal, self.val_abnormal = 0
+        #self.train_total , self.val_total = 0
     def merge(self,data,train_test):
         if(train_test):
             if(self.x_val is None):self.x_val = data.trainX;
@@ -53,19 +56,33 @@ class DataMerge():
                 else:
                     print("Data train parts nai Train mergee ")
 
+    def showDistribution(self):
+        self.train_normal = Counter(self.y_train)[0]
+        self.train_abnormal = Counter(self.y_train)[1]
+        self.train_total = self.train_normal+self.train_abnormal
+
+        self.val_normal = Counter(self.y_val)[0]
+        self.val_abnormal = Counter(self.y_val)[1]
+        self.val_total = self.val_normal+self.val_abnormal
+        print("Train normal - ", self.train_normal,"-",self.train_abnormal," Abnormal")
+        print( int(100*self.train_normal/self.train_total) , " - ", int(100*self.train_abnormal/self.train_total), "%")
+        print("Test normal - ", self.val_normal,"-",self.val_abnormal," Abnormal")
+        print( int(100*self.val_normal/self.val_total) , " - ", int(100*self.val_abnormal/self.val_total), "%")
+
+
 def getData(fold_dir, train_folds, test_folds, split = 0):
     try:
         with open('../data/domain_filename.json', 'r') as fp:
             foldname = json.load(fp)
     except:
-        raise FileNotFoundError("The json file that maps domain character to filename is not here")
+        raise FileNotFoundError("The json file in Data folder of the repository, that maps domain character to filename is not here")
 
     allData = DataMerge(split)
     for c in test_folds:
         allData.merge(Data(fold_dir,foldname[c],c,severe = False,split=split),True)
     for c in train_folds:
         allData.merge(Data(fold_dir,foldname[c],c),False)
-        
+    allData.showDistribution()
     return allData.x_train, allData.y_train, allData.y_domain, allData.train_parts,allData.x_val,allData.y_val,allData.y_valdom,allData.val_parts 
 
 
@@ -83,5 +100,4 @@ def reshape_folds(x, y):
         print("reshaped Y ", y1.shape)
 
     return x_train,y_train
-
 
