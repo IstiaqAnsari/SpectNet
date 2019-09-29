@@ -147,9 +147,9 @@ if __name__ == '__main__':
         else:
             lr = 0.0012843784
         if args.dann:
-            hp_lambda = args.dann
+            hp_lambda = np.float32(args.dann)
         else:
-            hp_lambda = 0
+            hp_lambda = np.float32(0)
 
         #########################################################
 

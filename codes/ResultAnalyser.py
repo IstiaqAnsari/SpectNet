@@ -57,10 +57,13 @@ class Results():
 
 ###              """class to hold single Result"""
 class Result():
-    def __init__(self,log):
+    def __init__(self,log,dann=False):
         self.log_dir = '../../Adversarial Heart Sound Results/logs/'
         self.metrics = ['val_macc','val_F1','val_precision','val_sensitivity','val_specificity']
         self.log_name = log.split(' ')[0]
+        if(dann):
+            self.log_dir = self.log_dir+'dann/'
+            self.log_name = self.log_name + " dann"
         self.trainer = self.log_name.split('_')[0]
         self.tester = self.log_name.split('_')[1]
         self.df = pd.read_csv(self.log_dir+log+'/training.csv')
@@ -69,15 +72,19 @@ class Result():
 
 ## Compare any number of result 
 class ResultsComparison():
-    def __init__(self,logs):
+    def __init__(self,logs,logs_dann=None):
+        if(logs_dann is not None):
+            self.log_dir_dann = '../../Adversarial Heart Sound Results/logs/dann/'
         self.log_dir = '../../Adversarial Heart Sound Results/logs/'
         self.metrics = ['val_macc','val_F1','val_precision','val_sensitivity','val_specificity']
         self.logs = logs
+        self.logs_dann = logs_dann
         self.data = []
         self.read()
     def read(self):
         self.data = [Result(l) for l in self.logs]
-        print(len(self.data))
+        if(self.logs_dann is not None):
+            self.data = self.data+[Result(l,True) for l in self.logs_dann]
     def show(self,width = 0.35,figsize=(8,5)):
         x = np.arange(len(self.metrics))
         print(x)
@@ -85,7 +92,6 @@ class ResultsComparison():
         plot_number = len(self.data)
         width = .8/plot_number
         idx = np.arange(-(plot_number-1)/2,(plot_number-1)/2+1,1)
-        print(idx)
         for i,d in enumerate(self.data):
             print(d.log_name)
             labels = list(d.df.values())
@@ -93,7 +99,7 @@ class ResultsComparison():
             self.autolabel(rect1,ax)
             #self.autolabel(rect1,ax)
         ax.set_xticks(x)
-        ax.set_title("Result comparison ")
+        ax.set_title("Orre kop ")
         ax.set_xticklabels(self.metrics)
         ax.legend()
         fig.tight_layout()
