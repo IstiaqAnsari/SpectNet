@@ -23,13 +23,13 @@ from keras.callbacks import LearningRateScheduler, ModelCheckpoint, CSVLogger
 from keras import backend as K
 from keras.utils import plot_model
 from Heartnet import heartnet 
-from dann_heartnet_v1 import log_macc, write_meta, compute_weight, results_log
+from utils import log_macc, results_log
 from dataLoader import reshape_folds
 from sklearn.metrics import confusion_matrix
 from keras.utils import to_categorical
 import matplotlib.pyplot as plt
 import seaborn as sns
-
+import Evaluator
 import dataLoader
 sns.set()
 
@@ -65,14 +65,16 @@ if __name__ == '__main__':
                             help = "Add comments to the log files")
         parser.add_argument("--type", type=int)
         parser.add_argument("--lr", type=float)
-
+        parser.add_argument("--eval",type=bool)
 
         args = parser.parse_args()
         if args.tune:
             test_split = args.tune
         else:
             test_split = 0
-
+        if args.eval:evaluate = args.eval
+        else: evaluate = False
+        print(evaluate)
         
         domain_list = 'abcdefghi'
         test_domains = args.test_domains
@@ -178,7 +180,8 @@ if __name__ == '__main__':
                 model_dir = model_dir + 'dann/'
                 log_dir = log_dir + 'dann/'
         if not os.path.exists(model_dir + log_name):
-            os.makedirs(model_dir + log_name)
+            if not evaluate:
+                os.makedirs(model_dir + log_name)
         checkpoint_name = model_dir + log_name + "/" + 'weights.{epoch:04d}-{val_class_acc:.4f}.hdf5'
         results_path = '../../results_2class.csv'
         outlayer = 'class'
@@ -222,7 +225,7 @@ if __name__ == '__main__':
         num_class_domain = len(set(train_domains + test_domains))
         num_class = 2
 
-        x_train, y_train, y_domain, train_parts,x_val, y_val, val_domain, val_parts = dataLoader.getData(fold_dir,train_domains,test_domains,test_split)
+        x_train, y_train, y_domain, train_parts,x_val, y_val, val_domain, val_parts, val_wav_files = dataLoader.getData(fold_dir,train_domains,test_domains,test_split)
 
         val_files = val_domain
         #Create meta labels and domain labels
@@ -243,187 +246,178 @@ if __name__ == '__main__':
         y_val = to_categorical(y_val, num_classes=num_class)
         val_domain = to_categorical(val_domain,num_classes=num_class_domain)
         print("Train  files ", y_train.shape, "  Domain ", y_domain.shape)
+
+
+
+
+
+
+
+
+
+
         
         ############## Create a model ############
-        model = heartnet(load_path,activation_function, bn_momentum, bias, dropout_rate, dropout_rate_dense,
+
+
+
+
+
+
+
+        ###  if evaluate is not selected  ####
+        if(evaluate):
+            load_path = '../../Adversarial Heart Sound Results/models/abcdef_gh_tune_0.3 Tuned 30 2019-09-29 10:31:11.451096/weights.0291-0.6917.hdf5'
+            model = heartnet(load_path,activation_function, bn_momentum, bias, dropout_rate, dropout_rate_dense,
                          eps, kernel_size, l2_reg, l2_reg_dense, lr, lr_decay, maxnorm,
                          padding, random_seed, subsam, num_filt, num_dense, FIR_train, trainable, type,num_class=num_class,num_class_domain=num_class_domain,hp_lambda=hp_lambda)
-        model.summary()
-        plot_model(model, to_file='model.png', show_shapes=True)
-        model_json = model.to_json()
-        with open(model_dir + log_name+"/model.json", "w") as json_file:
-            json_file.write(model_json)
+            y_pred,y_predDom = model.predict(x_val, verbose=verbose)
+            Evaluator.eval(y_val,y_pred,y_predDom,val_parts,val_wav_files,foldname)
+        else:
+            model = heartnet(load_path,activation_function, bn_momentum, bias, dropout_rate, dropout_rate_dense,
+                             eps, kernel_size, l2_reg, l2_reg_dense, lr, lr_decay, maxnorm,
+                             padding, random_seed, subsam, num_filt, num_dense, FIR_train, trainable, type,num_class=num_class,num_class_domain=num_class_domain,hp_lambda=hp_lambda)
+            model.summary()
+            plot_model(model, to_file='model.png', show_shapes=True)
+            model_json = model.to_json()
+            with open(model_dir + log_name+"/model.json", "w") as json_file:
+                json_file.write(model_json)
 
         ####### Define Callbacks ######
 
-        modelcheckpnt = ModelCheckpoint(filepath=checkpoint_name,
-                                        monitor='val_class_acc',save_best_only=False, mode='max') 
-        tensbd = TensorBoard(log_dir=log_dir + log_name,
-                             batch_size=batch_size, histogram_freq = 3,
-                             write_grads=True,
-                             # embeddings_freq=99,
-                             # embeddings_layer_names=embedding_layer_names,
-                             # embeddings_data=x_val,
-                             # embeddings_metadata=metadata_file,
-                             write_images=False)
-        csv_logger = CSVLogger(log_dir + log_name + '/training.csv')
-        ######### Scheduler #################
-        ## learning rate 
-        def step_decay(epoch):
-            
-            lr0 = .00128437
-            #print("learning rate , lr 0 ", lr, lr0)
-            a = 1
-            b = 1
-            p = epoch/epochs
-            lrate = lr0/math.pow((1+a*p),b)
-            return lrate
-        lrate = LearningRateScheduler(step_decay,verbose = 1)
-        # Lambda for gradient reversal layer
-        def f_hp_decay(epoch):
-            minEpoch = 100
-            if hp_lambda == 0:
-                return hp_lambda
-            if epoch<minEpoch:
-                return np.float32(hp_lambda)
-            gamma =  1
-            p = (epoch-200) / (epochs)
-            lam =  (2 / (1 + 1*(math.e ** (- gamma * p)))) - 1+.01  # 3 porjonto jaabe
-            # hp_lambda = hp_lambda * (params['hp_decay_const'] ** global_epoch_counter)
-            return np.float32(lam)
-        class hpRateScheduler(Callback):
-            """Learning rate scheduler.
-            # Arguments
-                schedule: a function that takes an epoch index as input
-                    (integer, indexed from 0) and current learning rate
-                    and returns a new learning rate as output (float).
-                verbose: int. 0: quiet, 1: update messages.
-            """
-            def __init__(self, schedule, verbose=0):
-                super(hpRateScheduler, self).__init__()
-                self.schedule = schedule
-                self.verbose = verbose
-            def on_epoch_begin(self, epoch,logs=None):
-                hp_lambda = self.schedule(epoch)
-                if not isinstance(hp_lambda, (float, np.float32, np.float64)):
-                    raise ValueError('The output of the "schedule" function '
-                                     'should be float.')
-                # K.set_value(self.model.layers[-3].hp_lambda, hp_lambda)
-                self.model.get_layer('grl').hp_lambda  = hp_lambda
-                if self.verbose > 0:
-                    print('\nEpoch %05d: HP setting hp_lambda '
-                          'rate to %s.' % (epoch + 1, hp_lambda))
-        hprate = hpRateScheduler(f_hp_decay,verbose = 1)
-        class MyCallback(Callback):
-            def on_epoch_begin(self, epoch, logs=None):
-                lr = self.model.optimizer.lr
-                # If you want to apply decay.
-                decay = self.model.optimizer.decay
-                iterations = self.model.optimizer.iterations
-                lr_with_decay = lr / (1. + decay * K.cast(iterations, K.dtype(decay)))
-                print(epoch, " Setting Learning rate: " , K.eval(lr_with_decay))
-        trackLr = MyCallback()
-        class TimeHistory(Callback):
-            def on_train_begin(self, logs={}):
-                self.times = []
+            modelcheckpnt = ModelCheckpoint(filepath=checkpoint_name,
+                                            monitor='val_class_acc',save_best_only=False, mode='max') 
+            tensbd = TensorBoard(log_dir=log_dir + log_name,
+                                 batch_size=batch_size, histogram_freq = 3,
+                                 write_grads=True,
+                                 # embeddings_freq=99,
+                                 # embeddings_layer_names=embedding_layer_names,
+                                 # embeddings_data=x_val,
+                                 # embeddings_metadata=metadata_file,
+                                 write_images=False)
+            csv_logger = CSVLogger(log_dir + log_name + '/training.csv')
+            ######### Scheduler #################
+            ## learning rate 
+            def step_decay(epoch):
+                
+                lr0 = .00128437
+                #print("learning rate , lr 0 ", lr, lr0)
+                a = 1
+                b = 1
+                p = epoch/epochs
+                lrate = lr0/math.pow((1+a*p),b)
+                return lrate
+            lrate = LearningRateScheduler(step_decay,verbose = 1)
+            # Lambda for gradient reversal layer
+            def f_hp_decay(epoch):
+                minEpoch = 100
+                if hp_lambda == 0:
+                    return hp_lambda
+                if epoch<minEpoch:
+                    return np.float32(hp_lambda)
+                gamma =  1
+                p = (epoch-200) / (epochs)
+                lam =  (2 / (1 + 1*(math.e ** (- gamma * p)))) - 1+.01  # 3 porjonto jaabe
+                # hp_lambda = hp_lambda * (params['hp_decay_const'] ** global_epoch_counter)
+                return np.float32(lam)
+            class hpRateScheduler(Callback):
+                """Learning rate scheduler.
+                # Arguments
+                    schedule: a function that takes an epoch index as input
+                        (integer, indexed from 0) and current learning rate
+                        and returns a new learning rate as output (float).
+                    verbose: int. 0: quiet, 1: update messages.
+                """
+                def __init__(self, schedule, verbose=0):
+                    super(hpRateScheduler, self).__init__()
+                    self.schedule = schedule
+                    self.verbose = verbose
+                def on_epoch_begin(self, epoch,logs=None):
+                    hp_lambda = self.schedule(epoch)
+                    if not isinstance(hp_lambda, (float, np.float32, np.float64)):
+                        raise ValueError('The output of the "schedule" function '
+                                         'should be float.')
+                    # K.set_value(self.model.layers[-3].hp_lambda, hp_lambda)
+                    self.model.get_layer('grl').hp_lambda  = hp_lambda
+                    if self.verbose > 0:
+                        print('\nEpoch %05d: HP setting hp_lambda '
+                              'rate to %s.' % (epoch + 1, hp_lambda))
+            hprate = hpRateScheduler(f_hp_decay,verbose = 1)
+            class MyCallback(Callback):
+                def on_epoch_begin(self, epoch, logs=None):
+                    lr = self.model.optimizer.lr
+                    # If you want to apply decay.
+                    decay = self.model.optimizer.decay
+                    iterations = self.model.optimizer.iterations
+                    lr_with_decay = lr / (1. + decay * K.cast(iterations, K.dtype(decay)))
+                    print(epoch, " Setting Learning rate: " , K.eval(lr_with_decay))
+            trackLr = MyCallback()
+            class TimeHistory(Callback):
+                def on_train_begin(self, logs={}):
+                    self.times = []
 
-            def on_epoch_begin(self, epoch, logs={}):
-                self.epoch_time_start = time.time()
+                def on_epoch_begin(self, epoch, logs={}):
+                    self.epoch_time_start = time.time()
 
-            def on_epoch_end(self, epoch, logs={}):
-                self.times.append(time.time() - self.epoch_time_start)
-                print("Epoch Time : ",time.time() - self.epoch_time_start)
-        time_callback = TimeHistory()
-        ######### Data Generator ############
-        datagen = BalancedAudioDataGenerator(
-                                     shift=.1,
-                                     # roll_range=.1,
-                                     # fill_mode='reflect',
-                                     # featurewise_center=True,
-                                     # zoom_range=.1,
-                                     # zca_whitening=True,
-                                     # samplewise_center=True,
-                                     # samplewise_std_normalization=True,
-                                     )
-        # valgen = AudioDataGenerator(
-        #     # fill_mode='reflect',
-        #     # featurewise_center=True,
-        #     # zoom_range=.2,
-        #     # zca_whitening=True,
-        #     # samplewise_center=True,
-        #     # samplewise_std_normalization=True,
-        # )
-        flow = datagen.flow(x_train, [y_train,y_domain],
-                            meta_label=meta_labels,
-                            batch_size=batch_size, shuffle=True,
-                            seed=random_seed)
-        model.fit_generator(flow,
-                            #steps_per_epoch=len(x_train) // batch_size,
-                            steps_per_epoch=flow.steps_per_epoch,
-                            # max_queue_size=20,
-                            use_multiprocessing=False,
-                            epochs=epochs,
-                            verbose=verbose,
-                            shuffle=True,
-                            callbacks=[modelcheckpnt,hprate,trackLr,time_callback,
-                                       log_macc(val_parts, decision=decision,verbose=verbose,val_files=val_files,checkpoint_name = checkpoint_name),
-                                       tensbd, csv_logger],
-                            validation_data=(x_val, [y_val,val_domain]),
-                            initial_epoch=initial_epoch,
-                            )
+                def on_epoch_end(self, epoch, logs={}):
+                    self.times.append(time.time() - self.epoch_time_start)
+                    print("Epoch Time : ",time.time() - self.epoch_time_start)
+            time_callback = TimeHistory()
+            ######### Data Generator ############
+            datagen = BalancedAudioDataGenerator(
+                                         shift=.1,
+                                         # roll_range=.1,
+                                         # fill_mode='reflect',
+                                         # featurewise_center=True,
+                                         # zoom_range=.1,
+                                         # zca_whitening=True,
+                                         # samplewise_center=True,
+                                         # samplewise_std_normalization=True,
+                                         )
+            # valgen = AudioDataGenerator(
+            #     # fill_mode='reflect',
+            #     # featurewise_center=True,
+            #     # zoom_range=.2,
+            #     # zca_whitening=True,
+            #     # samplewise_center=True,
+            #     # samplewise_std_normalization=True,
+            # )
+            flow = datagen.flow(x_train, [y_train,y_domain],
+                                meta_label=meta_labels,
+                                batch_size=batch_size, shuffle=True,
+                                seed=random_seed)
+            model.fit_generator(flow,
+                                #steps_per_epoch=len(x_train) // batch_size,
+                                steps_per_epoch=flow.steps_per_epoch,
+                                # max_queue_size=20,
+                                use_multiprocessing=False,
+                                epochs=epochs,
+                                verbose=verbose,
+                                shuffle=True,
+                                callbacks=[modelcheckpnt,hprate,trackLr,time_callback,
+                                           log_macc(val_parts, decision=decision,verbose=verbose,val_files=val_files,wav_files=val_wav_files,checkpoint_name = checkpoint_name),
+                                           tensbd, csv_logger],
+                                validation_data=(x_val, [y_val,val_domain]),
+                                initial_epoch=initial_epoch,
+                                )
 
 
-        ######### Run forest run!! ##########
+        
 
-        # if addweights:  ## if input arg classweights was specified True
-        #
-        #     class_weight = compute_weight(y_train, np.unique(y_train))
-        #
-        #     model.fit(x_train, y_train,
-        #               batch_size=batch_size,
-        #               epochs=epochs,
-        #               shuffle=True,
-        #               verbose=verbose,
-        #               validation_data=(x_val, y_val),
-        #               callbacks=[modelcheckpnt,
-        #                          log_macc(val_parts, decision=decision,verbose=verbose, val_files=val_files),
-        #                          tensbd, csv_logger],
-        #               initial_epoch=initial_epoch,
-        #               class_weight=class_weight)
-        #
-        # else:
-        #
-        #     model.fit(x_train, y_train,
-        #               batch_size=batch_size,
-        #               epochs=epochs,
-        #               shuffle=True,
-        #               verbose=verbose,
-        #               validation_data=(x_val, y_val),
-        #               callbacks=[
-        #                         # CyclicLR(base_lr=0.0001132885,
-        #                         #          max_lr=0.0012843784,
-        #                         #          step_size=8*(x_train.shape[0]//batch_size),
-        #                         #          ),
-        #                         modelcheckpnt,
-        #                         log_macc(val_parts, decision=decision,verbose=verbose, val_files=val_files),
-        #                         tensbd, csv_logger],
-        #               initial_epoch=initial_epoch)
-
-        ############### log results in csv ###############
-        plot_model(model, to_file=log_dir + log_name + '/model.png', show_shapes=True)
-        results_log(results_path=results_path, log_dir=log_dir, log_name=log_name,
-                    activation_function=activation_function, addweights=addweights,
-                    kernel_size=kernel_size, maxnorm=maxnorm,
-                    dropout_rate=dropout_rate, dropout_rate_dense=dropout_rate_dense, l2_reg=l2_reg,
-                    l2_reg_dense=l2_reg_dense, batch_size=batch_size,
-                    lr=lr, bn_momentum=bn_momentum, lr_decay=lr_decay,
-                    num_dense=num_dense, comment=comment,num_filt=num_filt,outlayer=outlayer)
-        # print(model.layers[1].get_weights())
-        # with K.get_session() as sess:
-        #     impulse_gammatone = sess.run(model.layers[1].impulse_gammatone())
-        # plt.plot(impulse_gammatone)
-        # plt.show()
-
+            ############### log results in csv ###############
+            plot_model(model, to_file=log_dir + log_name + '/model.png', show_shapes=True)
+            results_log(results_path=results_path, log_dir=log_dir, log_name=log_name,
+                        activation_function=activation_function, addweights=addweights,
+                        kernel_size=kernel_size, maxnorm=maxnorm,
+                        dropout_rate=dropout_rate, dropout_rate_dense=dropout_rate_dense, l2_reg=l2_reg,
+                        l2_reg_dense=l2_reg_dense, batch_size=batch_size,
+                        lr=lr, bn_momentum=bn_momentum, lr_decay=lr_decay,
+                        num_dense=num_dense, comment=comment,num_filt=num_filt,outlayer=outlayer)
+            # print(model.layers[1].get_weights())
+            # with K.get_session() as sess:
+            #     impulse_gammatone = sess.run(model.layers[1].impulse_gammatone())
+            # plt.plot(impulse_gammatone)
+            # plt.show()
 
     except KeyboardInterrupt:
         ############ If ended in advance ###########

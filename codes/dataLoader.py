@@ -8,7 +8,7 @@ class DataMerge():
         self.split = split
         self.x_train = self.y_train = self.y_domain = self.train_parts = None
         self.x_val = self.y_val = self.y_valdom = self.val_parts = None
-
+        self.val_wav_name = None
         #self.train_normal, self.train_abnormal, self.val_normal, self.val_abnormal = 0
         #self.train_total , self.val_total = 0
     def merge(self,data,train_test):
@@ -26,6 +26,10 @@ class DataMerge():
                     self.val_parts = np.concatenate((self.val_parts,data.train_parts),axis = 0)
                 else:
                     print("Data train parts unavailable")
+            if(self.val_wav_name is None):
+                self.val_wav_name = data.wav_name
+            else:
+                self.val_wav_name = self.val_wav_name+data.wav_name
             if(self.split>0):        
                 if(self.x_train is None):self.x_train = data.valX
                 else:self.x_train = np.concatenate((self.x_train,data.valX),axis = 1)
@@ -83,7 +87,7 @@ def getData(fold_dir, train_folds, test_folds, split = 0):
     for c in train_folds:
         allData.merge(Data(fold_dir,foldname[c],c),False)
     allData.showDistribution()
-    return allData.x_train, allData.y_train, allData.y_domain, allData.train_parts,allData.x_val,allData.y_val,allData.y_valdom,allData.val_parts 
+    return allData.x_train, allData.y_train, allData.y_domain, allData.train_parts,allData.x_val,allData.y_val,allData.y_valdom,allData.val_parts,allData.val_wav_name
 
 
 def reshape_folds(x, y):
