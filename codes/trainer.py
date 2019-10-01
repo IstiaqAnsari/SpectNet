@@ -226,6 +226,7 @@ if __name__ == '__main__':
         num_class = 2
 
         x_train, y_train, y_domain, train_parts,x_val, y_val, val_domain, val_parts, val_wav_files = dataLoader.getData(fold_dir,train_domains,test_domains,test_split)
+        
 
         val_files = val_domain
         #Create meta labels and domain labels
@@ -272,7 +273,7 @@ if __name__ == '__main__':
                          eps, kernel_size, l2_reg, l2_reg_dense, lr, lr_decay, maxnorm,
                          padding, random_seed, subsam, num_filt, num_dense, FIR_train, trainable, type,num_class=num_class,num_class_domain=num_class_domain,hp_lambda=hp_lambda)
             y_pred,y_predDom = model.predict(x_val, verbose=verbose)
-            Evaluator.eval(y_val,y_pred,y_predDom,val_parts,val_wav_files,foldname)
+            Evaluator.eval(y_val,y_pred,y_predDom,val_parts,val_files,val_wav_files,foldname)
         else:
             model = heartnet(load_path,activation_function, bn_momentum, bias, dropout_rate, dropout_rate_dense,
                              eps, kernel_size, l2_reg, l2_reg_dense, lr, lr_decay, maxnorm,

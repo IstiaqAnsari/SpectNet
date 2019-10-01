@@ -69,9 +69,9 @@ class DataMerge():
         self.val_abnormal = Counter(self.y_val)[1]
         self.val_total = self.val_normal+self.val_abnormal
         print("Train normal - ", self.train_normal,"-",self.train_abnormal," Abnormal")
-        print( int(100*self.train_normal/self.train_total) , " - ", int(100*self.train_abnormal/self.train_total), "%")
+        print("               ", int(100*self.train_normal/self.train_total) , " - ", int(100*self.train_abnormal/self.train_total), "%")
         print("Test normal - ", self.val_normal,"-",self.val_abnormal," Abnormal")
-        print( int(100*self.val_normal/self.val_total) , " - ", int(100*self.val_abnormal/self.val_total), "%")
+        print("              ",int(100*self.val_normal/self.val_total) , " - ", int(100*self.val_abnormal/self.val_total), "%")
 
 
 def getData(fold_dir, train_folds, test_folds, split = 0):

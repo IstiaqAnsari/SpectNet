@@ -13,7 +13,7 @@ from utils import log_macc, results_log
 
 
 
-def eval(y_val,y_pred,y_predDom,val_parts,val_wav_files,foldname):
+def eval(y_val,y_pred,y_predDom,val_parts,val_files,val_wav_files,foldname):
     true = []
     pred = []
     col = ["Wave file", "True", "Prediction", "Beats","Wrong predictions", "False Confidense"]
