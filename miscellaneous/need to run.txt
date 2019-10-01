@@ -1,11 +1,12 @@
-abcdef_gh
-abcdef_gh tune 0.3
-bcdefgh_a
-
 running 
-python trainer.py gh --epochs 300 --tune 0.3 --train_domains abcdef;python trainer.py gh --epochs 300 --train_domains abcdef;python trainer.py a --epochs 300 --tune 0.3 --train_domains bcdefgh
+abcdefi _ gh dann 
 
-abcdefi_gh_dann
-python trainer.py gh --epochs 300 --dann 0.01
 
-train on interspeech and test on interspeech validation data
+next 
+
+bcdefgh_a 
+bcdefgh_a  dann
+bcdefghi_a dann
+bcdefghi_a tune dann
+
+python trainer.py a --train_domains bcdefgh --epoch 200;python trainer.py a --train_domains bcdefgh --epoch 200 --dann 0.01
