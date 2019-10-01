@@ -165,6 +165,7 @@ if __name__ == '__main__':
 
         model_dir = '../../Adversarial Heart Sound Results/models/'
         fold_dir = '../../feature/potes_1DCNN/balancedCV/folds/folds_phys_compare_pascal/'
+        fold_dir = '../../feature/potes_1DCNN/balancedCV/folds/all_folds_wav_name/'
 
         if(test_split>0):
             log_name = foldname +' Tuned '+str(int(test_split*100))+' '+ str(datetime.now())
@@ -365,7 +366,7 @@ if __name__ == '__main__':
                             verbose=verbose,
                             shuffle=True,
                             callbacks=[modelcheckpnt,hprate,trackLr,time_callback,
-                                       log_macc(val_parts, decision=decision,verbose=verbose,val_files=val_files),
+                                       log_macc(val_parts, decision=decision,verbose=verbose,val_files=val_files,checkpoint_name = checkpoint_name),
                                        tensbd, csv_logger],
                             validation_data=(x_val, [y_val,val_domain]),
                             initial_epoch=initial_epoch,

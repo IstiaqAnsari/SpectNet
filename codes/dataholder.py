@@ -13,8 +13,10 @@ class Data():
         self.trainX = np.array(self.data['trainX'][:]).astype('float32')
         self.trainY = self.data['trainY'][:][0].astype('int8')
         self.train_parts = self.data['train_parts'][0].astype('int32')
+        self.wav_name = [''.join([chr(c[0]) for c in self.data[stp]]) for stp in self.data['wav_name'][0]]
         self.valX = None
         self.valY = None
+        self.val_wav_name = None
         self.valdomY = None
         self.val_parts = None
         self.domainY = [n]*self.trainY.shape[0]
@@ -41,8 +43,11 @@ class Data():
         tmpX = None
         tmpY = None
         parts = []
+        wav_name = []
+        self.val_wav_name = []
+        
         self.val_parts = []
-        for x in self.train_parts:
+        for j,x in enumerate(self.train_parts):
             if(taken<split*self.total):
                 taken = taken + x
                 if(self.valX is None):
@@ -53,6 +58,7 @@ class Data():
                     self.valX = np.concatenate((self.valX,self.trainX[:,left:x+left]),axis=1)
                     self.valY = np.concatenate((self.valY,self.trainY[left:x+left]),axis=0)
                 self.val_parts.append(x)
+                self.val_wav_name.append(self.wav_name[j])
             else:
                 if(tmpX is None):
                     tmpX = self.trainX[:,left:x+left]
@@ -61,20 +67,24 @@ class Data():
                     tmpX = np.concatenate((tmpX,self.trainX[:,left:x+left]),axis=1)
                     tmpY = np.concatenate((tmpY,self.trainY[left:x+left]),axis=0)
                 parts.append(x)
+                wav_name.append(self.wav_name[j])
             left = left + x
         self.trainX = tmpX
         self.trainY = tmpY
         self.train_parts = parts
+        self.wav_name = wav_name
         self.domainY = [self.dom]*self.trainY.shape[0]
         self.valdomY = [self.dom]*self.valY.shape[0]
         del tmpX,tmpY,parts
     def processCompare(self,severe):
         if(severe):
+            print("Wrong implementation, normal = 0, mild = 1, sever = 2. mild is being selected")
             self.sevX = None
             self.sevY = self.trainY[self.trainY<2]
             self.sev_parts = []
+            self.sev_wav_name = []
             left = int(0)
-            for x in self.train_parts:
+            for j,x in enumerate(self.train_parts):
                 x = int(x)
                 if(all([i==2 for i in self.trainY[left:x+left]])):
                     if(self.sevX is None):
@@ -83,6 +93,7 @@ class Data():
                         self.sevX = np.concatenate((self.sevX,self.trainX[:,left:x+left]),axis=1)
                 else:self.sev_parts.append(x)
                 left = x + left
+                
             self.trainX = self.sevX
             self.trainY = self.sevY
             self.train_parts = self.sev_parts
@@ -99,23 +110,27 @@ class Data():
         idx = []
         left = 0
         parts = []
-        for x in self.train_parts:
+        wav_name = []
+        for j,x in enumerate(self.train_parts):
             if(all([(l == 0) for l in self.trainY[left:left+x]])):
                 if(nn<self.abnormal):
                     idx = idx + [True]*x
                     nn = nn + x
                     parts.append(x)
+                    wav_name.append(self.wav_name[j])
                 else:idx = idx + [False]*x
             else:
                 if(ab<self.abnormal):
                     idx = idx + [True]*x
                     ab = ab + x
                     parts.append(x)
+                    wav_name.append(self.wav_name[j])
                 else:idx = idx + [False]*x
             left = left + x
         self.trainY = self.trainY[idx]
         self.trainX = np.transpose(np.transpose(self.trainX)[idx])
         self.train_parts = parts
+        self.wav_name = wav_name
         self.total = nn+ab
         self.domainY = self.domainY[:self.total]
     def parts(self):

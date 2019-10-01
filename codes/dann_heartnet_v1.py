@@ -68,9 +68,6 @@ def results_log(results_path,log_dir,log_name,activation_function,addweights,ker
     new_entry = pd.DataFrame(new_entry, index=[index])
     df2 = pd.concat([df, new_entry], axis=0)
     # df2 = df2.reindex(df.columns)
-    print("Sorting result csv")
-    df2.sort_values(by=['val_macc','val_F1'],ascending=False,inplace = True)
-    print("Sorted result csv")
     df2.to_csv(results_path, index=False)
     df2.tail()
     print("Saving to results.csv")
@@ -343,12 +340,14 @@ def heartnet(load_path,activation_function='relu', bn_momentum=0.99, bias=False,
 
 class log_macc(Callback):
 
-    def __init__(self, val_parts,decision='majority',verbose=0, val_files=None):
+    def __init__(self, val_parts,decision='majority',verbose=0, val_files=None,checkpoint_name=None):
         super(log_macc, self).__init__()
         self.val_parts = val_parts
         self.decision = decision
         self.verbose = verbose
         self.val_files = np.asarray(val_files)
+        self.checkpoint_name = checkpoint_name
+        print("Check point ", checkpoint_name)
         # self.x_val = x_val
         # self.y_val = y_val
 
@@ -428,6 +427,7 @@ class log_macc(Callback):
             logs['val_precision'] = np.array(precision)
             logs['val_F1'] = np.array(F1)
             logs['val_macc'] = np.array(Macc)
+            logs['model_path'] = self.checkpoint_name.format(epoch=epoch, val_class_acc=logs['val_class_acc'])
             if self.verbose:
                 print("TN:{},FP:{},FN:{},TP:{},Macc:{},F1:{}".format(TN, FP, FN, TP,Macc,F1))
 
