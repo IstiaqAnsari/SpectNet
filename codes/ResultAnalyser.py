@@ -92,12 +92,15 @@ class ResultsComparison():
         plot_number = len(self.data)
         width = .8/plot_number
         idx = np.arange(-(plot_number-1)/2,(plot_number-1)/2+1,1)
+        macc_avg = 0
         for i,d in enumerate(self.data):
+            macc_avg = macc_avg + d.df['val_macc']
             print(d.log_name)
             labels = list(d.df.values())
             rect1 = ax.bar(x+idx[i]*width,labels,width,label=d.log_name)
             self.autolabel(rect1,ax)
             #self.autolabel(rect1,ax)
+        print(macc_avg/plot_number)
         ax.set_xticks(x)
         ax.set_title("Orre kop ")
         ax.set_xticklabels(self.metrics)
