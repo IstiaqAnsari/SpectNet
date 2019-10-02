@@ -234,7 +234,8 @@ if __name__ == '__main__':
         if(test_split>0):
             domains = domains + test_domains
         domainClass = [(cls,dfc) for cls in range(2) for dfc in domains]
-
+        
+        print(domainClass)
         meta_labels = [domainClass.index((cl,df)) for (cl,df) in zip(y_train,y_domain)]
 
         y_domain = np.array([list(set(train_domains+test_domains)).index(lab) for lab in y_domain])
@@ -268,6 +269,11 @@ if __name__ == '__main__':
 
         ###  if evaluate is not selected  ####
         if(evaluate):
+            print("Testing")
+            print("Testing")
+            print("Testing")
+            print("Testing")
+
             weight = 'weights.0155-0.5229.hdf5'
             logname = 'abcdefgh_i_tune_0.3 Tuned 30 2019-09-26 14:24:11.245075'
             load_path = '../../Adversarial Heart Sound Results/models/'
@@ -278,6 +284,11 @@ if __name__ == '__main__':
             y_pred,y_predDom = model.predict(x_val, verbose=verbose)
             Evaluator.eval(y_val,y_pred,y_predDom,val_parts,val_files,val_wav_files,foldname)
         else:
+            print("Training")
+            print("Training")
+            print("Training")
+            print("Training")
+
             model = heartnet(load_path,activation_function, bn_momentum, bias, dropout_rate, dropout_rate_dense,
                              eps, kernel_size, l2_reg, l2_reg_dense, lr, lr_decay, maxnorm,
                              padding, random_seed, subsam, num_filt, num_dense, FIR_train, trainable, type,num_class=num_class,num_class_domain=num_class_domain,hp_lambda=hp_lambda)
@@ -424,13 +435,15 @@ if __name__ == '__main__':
             # plt.show()
 
     except KeyboardInterrupt:
+        if not evaluate:
+            print("Why would you interapt evaluations -_- ")
         ############ If ended in advance ###########
-        plot_model(model, to_file=log_dir + log_name + '/model.png', show_shapes=True)
-        results_log(results_path=results_path, log_dir=log_dir, log_name=log_name,
-                    activation_function=activation_function, addweights=addweights,
-                    kernel_size=kernel_size, maxnorm=maxnorm,
-                    dropout_rate=dropout_rate, dropout_rate_dense=dropout_rate_dense, l2_reg=l2_reg,
-                    l2_reg_dense=l2_reg_dense, batch_size=batch_size,
-                    lr=lr, bn_momentum=bn_momentum, lr_decay=lr_decay,
-                    num_dense=num_dense, comment=comment,num_filt=num_filt,outlayer=outlayer)
+            plot_model(model, to_file=log_dir + log_name + '/model.png', show_shapes=True)
+            results_log(results_path=results_path, log_dir=log_dir, log_name=log_name,
+                        activation_function=activation_function, addweights=addweights,
+                        kernel_size=kernel_size, maxnorm=maxnorm,
+                        dropout_rate=dropout_rate, dropout_rate_dense=dropout_rate_dense, l2_reg=l2_reg,
+                        l2_reg_dense=l2_reg_dense, batch_size=batch_size,
+                        lr=lr, bn_momentum=bn_momentum, lr_decay=lr_decay,
+                        num_dense=num_dense, comment=comment,num_filt=num_filt,outlayer=outlayer)
 
