@@ -18,7 +18,8 @@ import pandas as pd
 import tables,h5py
 from datetime import datetime
 import argparse
-from keras.callbacks import TensorBoard, Callback, ReduceLROnPlateau
+from keras.callbacks import Callback, ReduceLROnPlateau
+from CustomTensorBoard import TensorBoard
 from keras.callbacks import LearningRateScheduler, ModelCheckpoint, CSVLogger
 from keras import backend as K
 from keras.utils import plot_model
