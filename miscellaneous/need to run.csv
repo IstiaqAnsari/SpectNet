@@ -1,0 +1,14 @@
+train,test,tune,dann,done
+abcdefi,gh,0,0,1
+abcdefi,gh,0,1,0
+abcdefi,gh,1,0,1
+abcdefi,gh,1,1,1
+abcdefgh,i,0,0,0
+abcdefgh,i,0,1,0
+abcdefgh,i,1,0,1
+abcdefgh,i,1,1,0
+bcdefghi,a,0,0,0
+bcdefghi,a,0,1,0
+bcdefghi,a,1,0,0
+bcdefghi,a,1,1,0
+python trainer.py gh --epochs 400 --dann 0.01;python trainer.py i --epochs 400 --tune 0.3 --dann 0.01;python trainer.py a --epochs 200;python trainer.py a --epochs 400 --dann 0.01; python trainer.py a --epochs 400 --tune 0.3 --dann 0.01;,,,,
