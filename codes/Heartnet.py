@@ -149,6 +149,9 @@ def heartnet(load_path,activation_function='relu', bn_momentum=0.99, bias=False,
 
     model = Model(inputs=input, outputs=[merged,dsc])
 
+    if load_path:
+        model.load_weights(filepath=load_path, by_name=False)
+
     #if load_path:  # If path for loading model was specified
     #model.load_weights(filepath='../../models_dbt_dann/fold_a_gt 2019-09-09 16:53:52.063276/weights.0041-0.6907.hdf5', by_name=True)
     # models/fold_a_gt 2019-09-04 17:36:52.860817/weights.0200-0.7135.hdf5

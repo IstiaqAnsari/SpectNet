@@ -8,7 +8,7 @@ from keras.layers import activations, initializers, regularizers, constraints
 import numpy as np
 from scipy.fftpack import dct
 from keras.backend.common import normalize_data_format
-
+from keras.layers.merge import Multiply
 class Scale(Layer):
     '''Custom Layer for ResNet used for BatchNormalization.
 
@@ -848,4 +848,56 @@ class Conv1D_gammatone(Layer):
             'bias_initializer': initializers.serialize(self.bias_initializer),
         }
         base_config = super(Conv1D_gammatone, self).get_config()
+        return dict(list(base_config.items()) + list(config.items()))
+
+class Attention(Layer):
+    '''Custom Layer for ResNet used for BatchNormalization.
+
+    Linear learnable weight vector , does dot multiplication on a vector
+    # Arguments
+        axis: integer, axis along which to normalize in mode 0. For instance,
+            if your input tensor has shape (samples, channels, rows, cols),
+            set axis to 1 to normalize per feature map (channels axis).'''
+
+    def __init__(self, weights=None, axis=-1,init='he_normal', **kwargs):
+        self.axis = axis
+        self.init = initializers.get(beta_init)
+        self.kernel = weights
+        super(Attention, self).__init__(**kwargs)
+
+    def build(self, input_shape):
+        self.input_dim = input_shape[-1]
+
+        self.gamma = K.variable(self.gamma_init(shape), name='%s_gamma' % self.name)
+        self.beta = K.variable(self.beta_init(shape), name='%s_beta' % self.name)
+        self.trainable_weights = [self.gamma, self.beta]
+
+        if self.initial_weights is not None:
+            self.set_weights(self.initial_weights)
+            del self.initial_weights
+
+        self.built = True
+
+    def build(self, input_shape):
+        self.input_dim = input_shape[-1]
+
+        self.kernel = self.add_weight(shape=(input_dim, ),
+                                      initializer=self.init,
+                                      name='kernel',
+                                      constraint=keras.constraints.UnitNorm(axis=self.axis))
+        self.input_spec = InputSpec(min_ndim=2, axes={-1: input_dim})
+        self.built = True
+
+    def call(self, inputs):
+        output = K.dot(inputs, self.kernel)
+        if self.use_bias:
+            output = K.bias_add(output, self.bias, data_format='channels_last')
+        if self.activation is not None:
+            output = self.activation(output)
+        return output
+    def compute_output_shape(self, input_shape):
+        return input_shape
+    def get_config(self):
+        config = {"momentum": self.momentum, "axis": self.axis}
+        base_config = super(Scale, self).get_config()
         return dict(list(base_config.items()) + list(config.items()))

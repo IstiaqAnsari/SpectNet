@@ -102,7 +102,7 @@ class ResultsComparison():
             #self.autolabel(rect1,ax)
         print(macc_avg/plot_number)
         ax.set_xticks(x)
-        ax.set_title("Orre kop ")
+        ax.set_title("Results Comparison")
         ax.set_xticklabels(self.metrics)
         ax.legend()
         fig.tight_layout()
