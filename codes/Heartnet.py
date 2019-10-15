@@ -1,5 +1,5 @@
 from custom_layers import Conv1D_zerophase_linear, Conv1D_linearphase, Conv1D_zerophase,\
-    DCT1D, Conv1D_gammatone, Conv1D_linearphaseType
+    DCT1D, Conv1D_gammatone, Conv1D_linearphaseType, Attention
 from keras.layers import Input, Conv1D, MaxPooling1D, Dense, Dropout, Flatten, Activation, AveragePooling1D
 from keras import initializers
 from keras.layers.normalization import BatchNormalization
@@ -11,7 +11,7 @@ from keras.optimizers import Adam, SGD # Nadam, Adamax
 import numpy as np
 import tables,h5py
 from Gradient_Reverse_Layer import GradientReversal
-
+from ResultAnalyser import Result
 
 
 
@@ -47,7 +47,8 @@ def branch(input_tensor,num_filt,kernel_size,random_seed,padding,bias,maxnorm,l2
 
 def heartnet(load_path,activation_function='relu', bn_momentum=0.99, bias=False, dropout_rate=0.5, dropout_rate_dense=0.0,
              eps=1.1e-5, kernel_size=5, l2_reg=0.0, l2_reg_dense=0.0,lr=0.0012843784, lr_decay=0.0001132885, maxnorm=10000.,
-             padding='valid', random_seed=1, subsam=2, num_filt=(8, 4), num_dense=20,FIR_train=False,trainable=True,type=1,num_class=2, num_class_domain=1,hp_lambda=0):
+             padding='valid', random_seed=1, subsam=2, num_filt=(8, 4), num_dense=20,FIR_train=False,trainable=True,type=1,
+             num_class=2, num_class_domain=1,hp_lambda=0):
     
     #num_dense = 20 default 
     input = Input(shape=(2500, 1))
@@ -134,14 +135,16 @@ def heartnet(load_path,activation_function='relu', bn_momentum=0.99, bias=False,
                    kernel_initializer=initializers.he_normal(seed=random_seed),
                    use_bias=bias,
                    kernel_constraint=max_norm(maxnorm),
-                   kernel_regularizer=l2(l2_reg_dense))(dann_in)   
+                   kernel_regularizer=l2(l2_reg_dense),
+                   name = 'domain_dense')(dann_in)   
     dsc = Dense(num_class_domain, activation='softmax', name = "domain")(dsc)          
     merged = Dense(num_dense,
                    activation=activation_function,
                    kernel_initializer=initializers.he_normal(seed=random_seed),
                    use_bias=bias,
                    kernel_constraint=max_norm(maxnorm),
-                   kernel_regularizer=l2(l2_reg_dense))(merged)
+                   kernel_regularizer=l2(l2_reg_dense),
+                   name = 'class_dense')(merged)
     # merged = BatchNormalization(epsilon=eps,momentum=bn_momentum,axis=-1) (merged)
     # merged = Activation(activation_function)(merged)
     #merged = Dropout(rate=dropout_rate_dense, seed=random_seed)(merged)
@@ -159,6 +162,32 @@ def heartnet(load_path,activation_function='relu', bn_momentum=0.99, bias=False,
     #if optim=='Adam':
     #    opt = Adam(lr=lr, decay=lr_decay)
     #else:
+    opt = SGD(lr=lr,decay=lr_decay)
+
+    model.compile(optimizer=opt, loss={'class':'categorical_crossentropy','domain':'categorical_crossentropy'}, metrics=['accuracy'])
+    return model
+
+def getAttentionModel(model,foldname,lr,lr_decay):
+    load_path = Result(foldname, find = True).df['model_path']
+    load_path = load_path.replace(load_path[-16:-12],str(int(load_path[-16:-12])+1).rjust(4,'0'))
+
+    model.load_weights(load_path)
+    layers = {x.name:x for x in model.layers[-5:]}
+    layers
+    while('flatten' not in model.layers[-1].name):
+        model.layers.pop()
+    merged = Attention(name='att')(model.layers[-1].output)
+    dann_in = layers['grl'](merged)
+    dsc = layers['domain_dense'](dann_in)
+    dsc = layers['domain'](dsc)
+    merged = layers['class_dense'](merged)
+    merged = layers['class'](merged)
+    model = Model(inputs=model.layers[0].input, outputs=[merged,dsc])
+    for layer in model.layers:
+        if 'flatten' in layer.name:
+            break
+        else:
+            layer.trainable = False
     opt = SGD(lr=lr,decay=lr_decay)
 
     model.compile(optimizer=opt, loss={'class':'categorical_crossentropy','domain':'categorical_crossentropy'}, metrics=['accuracy'])
