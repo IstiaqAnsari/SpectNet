@@ -859,45 +859,34 @@ class Attention(Layer):
             if your input tensor has shape (samples, channels, rows, cols),
             set axis to 1 to normalize per feature map (channels axis).'''
 
-    def __init__(self, weights=None, axis=-1,init='he_normal', **kwargs):
+    def __init__(self, weights=None, axis=-1,init='he_normal',**kwargs):
         self.axis = axis
-        self.init = initializers.get(beta_init)
+        self.init = initializers.get(init)
         self.kernel = weights
         super(Attention, self).__init__(**kwargs)
-
     def build(self, input_shape):
-        self.input_dim = input_shape[-1]
-
-        self.gamma = K.variable(self.gamma_init(shape), name='%s_gamma' % self.name)
-        self.beta = K.variable(self.beta_init(shape), name='%s_beta' % self.name)
-        self.trainable_weights = [self.gamma, self.beta]
-
-        if self.initial_weights is not None:
-            self.set_weights(self.initial_weights)
-            del self.initial_weights
-
-        self.built = True
-
-    def build(self, input_shape):
-        self.input_dim = input_shape[-1]
-
-        self.kernel = self.add_weight(shape=(input_dim, ),
-                                      initializer=self.init,
+        if len(input_shape)>2:
+            raise ValueError("Input to attention layer hasn't been flattened")
+        self.input_dim = input_shape[-1]            
+        self.kernel = self.add_weight(shape=(self.input_dim,),
+                                      initializer=initializers.Ones(),
                                       name='kernel',
-                                      constraint=keras.constraints.UnitNorm(axis=self.axis))
-        self.input_spec = InputSpec(min_ndim=2, axes={-1: input_dim})
+                                      constraint=constraints.NonNeg()
+                                      #constraint=constraints.min_max_norm(min_value=0.0, max_value=1.0)
+                                      #constraint=constraints.UnitNorm(axis=self.axis)
+                                     )
+        self.input_spec = InputSpec(min_ndim=2, axes={-1: self.input_dim})            
         self.built = True
-
     def call(self, inputs):
-        output = K.dot(inputs, self.kernel)
-        if self.use_bias:
-            output = K.bias_add(output, self.bias, data_format='channels_last')
-        if self.activation is not None:
-            output = self.activation(output)
+        output = tf.multiply(inputs,self.kernel)
         return output
     def compute_output_shape(self, input_shape):
         return input_shape
+
     def get_config(self):
-        config = {"momentum": self.momentum, "axis": self.axis}
-        base_config = super(Scale, self).get_config()
+        config = {
+            'axis': self.axis,
+            'kernel_initializer': initializers.serialize(self.init)
+        }
+        base_config = super(Attention, self).get_config()
         return dict(list(base_config.items()) + list(config.items()))

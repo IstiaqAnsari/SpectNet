@@ -99,7 +99,7 @@ class log_macc(Callback):
             logs['val_precision'] = np.array(precision)
             logs['val_F1'] = np.array(F1)
             logs['val_macc'] = np.array(Macc)
-            logs['model_path'] = self.checkpoint_name.format(epoch=epoch, val_class_acc=logs['val_class_acc'])
+            logs['model_path'] = self.checkpoint_name.format(epoch=epoch+1, val_class_acc=logs['val_class_acc'])   ## added one with epoch for correct indexing
             if self.verbose:
                 print("TN:{},FP:{},FN:{},TP:{},Macc:{},F1:{}".format(TN, FP, FN, TP,Macc,F1))
 

@@ -57,13 +57,21 @@ class Results():
 
 ###              """class to hold single Result"""
 class Result():
-    def __init__(self,log,dann=False):
+    def __init__(self,log,dann=False,find = False):
+        #find is a bool, if true then the log name is searched using the log when the log is only the fold name
+        # not the full path . result comparison calls it with the full path. so no need of find
         self.log_dir = '../../Adversarial Heart Sound Results/logs/'
         self.metrics = ['val_macc','val_F1','val_precision','val_sensitivity','val_specificity']
         self.log_name = log.split(' ')[0]
         if(dann):
             self.log_dir = self.log_dir+'dann/'
             self.log_name = self.log_name + " dann"
+        if(find):
+            self.metrics.append('model_path')
+            for x in os.listdir(self.log_dir):
+                if log in x:
+                    log = x
+                    break
         self.trainer = self.log_name.split('_')[0]
         self.tester = self.log_name.split('_')[1]
         self.df = pd.read_csv(self.log_dir+log+'/training.csv')

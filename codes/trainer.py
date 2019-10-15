@@ -23,7 +23,7 @@ from CustomTensorBoard import TensorBoard
 from keras.callbacks import LearningRateScheduler, ModelCheckpoint, CSVLogger
 from keras import backend as K
 from keras.utils import plot_model
-from Heartnet import heartnet 
+from Heartnet import heartnet, getAttentionModel
 from utils import log_macc, results_log
 from dataLoader import reshape_folds
 from sklearn.metrics import confusion_matrix
@@ -67,6 +67,7 @@ if __name__ == '__main__':
         parser.add_argument("--type", type=int)
         parser.add_argument("--lr", type=float)
         parser.add_argument("--eval",type=bool)
+        parser.add_argument("--att",type=bool)
 
         args = parser.parse_args()
         if args.tune:
@@ -75,6 +76,8 @@ if __name__ == '__main__':
             test_split = 0
         if args.eval:evaluate = args.eval
         else: evaluate = False
+        if args.att:attention = args.att
+        else: attention = False
         print(evaluate)
         
         domain_list = 'abcdefghi'
@@ -176,6 +179,11 @@ if __name__ == '__main__':
             log_name = foldname + ' ' + str(datetime.now())
 
         log_dir = '../../Adversarial Heart Sound Results/logs/'
+
+        if(attention):
+            print("Training with Attention layer")
+            model_dir = model_dir + 'attention/'
+            log_dir = log_dir + 'attention/'
         if(args.dann):
             if(args.dann>0):
                 model_dir = model_dir + 'dann/'
@@ -289,7 +297,11 @@ if __name__ == '__main__':
 
             model = heartnet(load_path,activation_function, bn_momentum, bias, dropout_rate, dropout_rate_dense,
                              eps, kernel_size, l2_reg, l2_reg_dense, lr, lr_decay, maxnorm,
-                             padding, random_seed, subsam, num_filt, num_dense, FIR_train, trainable, type,num_class=num_class,num_class_domain=num_class_domain,hp_lambda=hp_lambda)
+                             padding, random_seed, subsam, num_filt, num_dense, FIR_train, trainable, type,
+                             num_class=num_class,num_class_domain=num_class_domain,hp_lambda=hp_lambda)
+            if(attention):
+                model = getAttentionModel(model,foldname,lr,lr_decay)
+
             model.summary()
             plot_model(model, to_file='model.png', show_shapes=True)
             model_json = model.to_json()
