@@ -59,7 +59,8 @@ class Results():
 class Result():
     def __init__(self,log,dann=False,find = False):
         #find is a bool, if true then the log name is searched using the log when the log is only the fold name
-        # not the full path . result comparison calls it with the full path. so no need of find
+        # not the full path . result comparison calls it with the full path. so no need of find variable 
+        # but must in model loading which is set in heartnet.getattentionModel
         self.log_dir = '../../Adversarial Heart Sound Results/logs/'
         self.metrics = ['val_macc','val_F1','val_precision','val_sensitivity','val_specificity']
         self.log_name = log.split(' ')[0]
