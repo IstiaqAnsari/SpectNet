@@ -363,10 +363,14 @@ if __name__ == '__main__':
                         raise ValueError('The output of the "schedule" function '
                                          'should be float.')
                     # K.set_value(self.model.layers[-3].hp_lambda, hp_lambda)
-                    self.model.get_layer('grl').hp_lambda  = hp_lambda
-                    if self.verbose > 0:
-                        print('\nEpoch %05d: HP setting hp_lambda '
-                              'rate to %s.' % (epoch + 1, hp_lambda))
+                    try:
+                        self.model.get_layer('grl').hp_lambda  = hp_lambda
+                        if self.verbose > 0:
+                            print('\nEpoch %05d: HP setting hp_lambda '
+                                  'rate to %s.' % (epoch + 1, hp_lambda))
+                    except:
+                        print("Gradient reversal layer is not added")
+                    
             hprate = hpRateScheduler(f_hp_decay,verbose = 1)
             class MyCallback(Callback):
                 def on_epoch_begin(self, epoch, logs=None):
