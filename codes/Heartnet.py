@@ -129,7 +129,9 @@ def heartnet(load_path,activation_function='relu', bn_momentum=0.99, bias=False,
     # merged = DCT1D()(merged)
     merged = Flatten()(merged)
     # discriminator
-    dann_in = GradientReversal(hp_lambda=hp_lambda,name='grl')(merged)
+    dann_in = Attention(name='domain_att',trainable=False)(merged)
+    merged = Attention(name = 'class_att',trainable=False)(merged)
+    #dann_in = GradientReversal(hp_lambda=hp_lambda,name='grl')(merged)
     dsc = Dense(50,
                    activation=activation_function,
                    kernel_initializer=initializers.he_normal(seed=random_seed),
