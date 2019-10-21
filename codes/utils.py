@@ -8,6 +8,9 @@ import pandas as pd
 from keras.callbacks import  Callback, ReduceLROnPlateau
 from keras.optimizers import Adam
 from sklearn.metrics import confusion_matrix
+from keras import backend as K
+import tensorflow as tf
+from keras.utils import to_categorical
 
 class log_macc(Callback):
 
@@ -167,3 +170,15 @@ def results_log(results_path,log_dir,log_name,activation_function,addweights,ker
     df2.to_csv(results_path, index=False)
     df2.tail()
     print("Saving to results.csv")
+
+def Confused_Crossentropy(y_true, y_pred):
+    y_predfused = tf.multiply(y_pred,0)+.5
+    #y_predfused = tf.convert_to_tensor((np.ones((batch,num_class),dtype=np.float32)*0.5))
+    #y_truefused = tf.convert_to_tensor( to_categorical(np.ones(batch),num_class) )
+    return K.abs(K.categorical_crossentropy(y_true, y_pred)-K.categorical_crossentropy(y_true,y_predfused))
+
+def Confused_Crossentropy(y_true, y_pred):
+    y_predfused = tf.multiply(y_pred,0)+.5
+    #y_predfused = tf.convert_to_tensor((np.ones((batch,num_class),dtype=np.float32)*0.5))
+    #y_truefused = tf.convert_to_tensor( to_categorical(np.ones(batch),num_class) )
+    return K.abs(K.categorical_crossentropy(y_true, y_pred)-K.categorical_crossentropy(y_true,y_predfused))
