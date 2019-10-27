@@ -12,7 +12,7 @@ import numpy as np
 import tables,h5py
 from Gradient_Reverse_Layer import GradientReversal
 from ResultAnalyser import Result
-
+from utils import Confused_Crossentropy
 
 
 
@@ -48,7 +48,7 @@ def branch(input_tensor,num_filt,kernel_size,random_seed,padding,bias,maxnorm,l2
 def heartnet(load_path,activation_function='relu', bn_momentum=0.99, bias=False, dropout_rate=0.5, dropout_rate_dense=0.0,
              eps=1.1e-5, kernel_size=5, l2_reg=0.0, l2_reg_dense=0.0,lr=0.0012843784, lr_decay=0.0001132885, maxnorm=10000.,
              padding='valid', random_seed=1, subsam=2, num_filt=(8, 4), num_dense=20,FIR_train=False,trainable=True,type=1,
-             num_class=2, num_class_domain=1,hp_lambda=0):
+             num_class=2, num_class_domain=1,hp_lambda=0,batch_size=1024):
     
     #num_dense = 20 default 
     input = Input(shape=(2500, 1))
@@ -129,9 +129,9 @@ def heartnet(load_path,activation_function='relu', bn_momentum=0.99, bias=False,
     # merged = DCT1D()(merged)
     merged = Flatten()(merged)
     # discriminator
-    dann_in = Attention(name='domain_att',trainable=False)(merged)
-    merged = Attention(name = 'class_att',trainable=False)(merged)
-    #dann_in = GradientReversal(hp_lambda=hp_lambda,name='grl')(merged)
+    #dann_in = Attention(name='domain_att',trainable=False)(merged)
+    #merged = Attention(name = 'class_att',trainable=False)(merged)
+    dann_in = GradientReversal(hp_lambda=hp_lambda,name='grl')(merged)
     dsc = Dense(50,
                    activation=activation_function,
                    kernel_initializer=initializers.he_normal(seed=random_seed),
@@ -163,10 +163,10 @@ def heartnet(load_path,activation_function='relu', bn_momentum=0.99, bias=False,
     
     #if optim=='Adam':
     #    opt = Adam(lr=lr, decay=lr_decay)
-    #else:
+    #else:  
     opt = SGD(lr=lr,decay=lr_decay)
-
-    model.compile(optimizer=opt, loss={'class':'categorical_crossentropy','domain':'categorical_crossentropy'}, metrics=['accuracy'])
+    model.compile(optimizer=opt, loss={'class':'binary_crossentropy','domain':'binary_crossentropy'}, metrics=['accuracy'])
+    #model.compile(optimizer=opt, loss={'class':'categorical_crossentropy','domain':'categorical_crossentropy'}, metrics=['accuracy'])
     return model
 
 def getAttentionModel(model,foldname,lr,lr_decay):
