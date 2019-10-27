@@ -120,7 +120,10 @@ if __name__ == '__main__':
             print("Training for %d epochs" % (args.epochs))
             epochs = args.epochs
         else:
-            epochs = 400
+            if args.dann:
+                epochs = 400
+            else:
+                epochs = 200
             print("Training for %d epochs" % (epochs))
 
         if args.batch_size:  # if batch_size is specified
@@ -295,10 +298,11 @@ if __name__ == '__main__':
             print("Training")
             print("Training")
 
+
             model = heartnet(load_path,activation_function, bn_momentum, bias, dropout_rate, dropout_rate_dense,
                              eps, kernel_size, l2_reg, l2_reg_dense, lr, lr_decay, maxnorm,
                              padding, random_seed, subsam, num_filt, num_dense, FIR_train, trainable, type,
-                             num_class=num_class,num_class_domain=num_class_domain,hp_lambda=hp_lambda)
+                             num_class=num_class,num_class_domain=num_class_domain,hp_lambda=hp_lambda,batch_size=batch_size)
             if(attention):
                 model = getAttentionModel(model,foldname,lr,lr_decay)
 
