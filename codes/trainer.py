@@ -350,10 +350,10 @@ if __name__ == '__main__':
                 minEpoch = 100
                 if hp_lambda == 0:
                     return hp_lambda
-                if epoch<minEpoch:
-                    return np.float32(hp_lambda)
-                gamma =  1
-                p = (epoch-200) / (epochs)
+                #f epoch<minEpoch:
+                    #eturn np.float32(hp_lambda)
+                gamma =  4
+                p = (epoch) / (epochs)
                 lam =  (2 / (1 + 1*(math.e ** (- gamma * p)))) - 1+.01  # 3 porjonto jaabe
                 # hp_lambda = hp_lambda * (params['hp_decay_const'] ** global_epoch_counter)
                 return np.float32(lam)
