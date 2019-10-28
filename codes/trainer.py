@@ -173,7 +173,7 @@ if __name__ == '__main__':
 
 
         model_dir = '../../Adversarial Heart Sound Results/models/'
-        fold_dir = '../../feature/potes_1DCNN/balancedCV/folds/folds_phys_compare_pascal/'
+        #fold_dir = '../../feature/potes_1DCNN/balancedCV/folds/folds_phys_compare_pascal/'
         fold_dir = '../../feature/potes_1DCNN/balancedCV/folds/all_folds_wav_name/'
 
         if(test_split>0):
@@ -239,23 +239,31 @@ if __name__ == '__main__':
 
         x_train, y_train, y_domain, train_parts,x_val, y_val, val_domain, val_parts, val_wav_files = dataLoader.getData(fold_dir,train_domains,test_domains,test_split)
 
-
         val_files = val_domain
         #Create meta labels and domain labels
         domains = train_domains
         if(test_split>0):
             domains = domains + test_domains
+        if(args.dann):
+            domains = domains + test_domains
         domainClass = [(cls,dfc) for cls in range(2) for dfc in domains]
-        
-        print(domainClass)
-        meta_labels = [domainClass.index((cl,df)) for (cl,df) in zip(y_train,y_domain)]
+        if(args.dann):
+            meta_labels = [domainClass.index((cl,df)) for (cl,df) in zip(np.concatenate((y_train,y_val)),(y_domain+val_domain))]
+        else:
+            meta_labels = [domainClass.index((cl,df)) for (cl,df) in zip(y_train,y_domain)]
 
         y_domain = np.array([list(set(train_domains+test_domains)).index(lab) for lab in y_domain])
+
         val_domain = np.array([list(set(train_domains+test_domains)).index(lab) for lab in val_domain])
 
         ################### Reshaping ############
+        if(args.dann):
+            x_train = np.concatenate((x_train,x_val),axis=1)
+            y_domain= np.concatenate((y_domain,val_domain))
         [x_train, x_val], [y_train,y_domain,y_val] = reshape_folds([x_train,x_val],[y_train,y_domain,y_val])
         y_train = to_categorical(y_train, num_classes=num_class)
+        if(args.dann):
+            y_train = np.concatenate((y_train,np.zeros((y_val.shape[0],2))))
         y_domain = to_categorical(y_domain,num_classes=num_class_domain)
         y_val = to_categorical(y_val, num_classes=num_class)
         val_domain = to_categorical(val_domain,num_classes=num_class_domain)
