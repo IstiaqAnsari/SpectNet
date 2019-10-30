@@ -23,7 +23,8 @@ from CustomTensorBoard import TensorBoard
 from keras.callbacks import LearningRateScheduler, ModelCheckpoint, CSVLogger
 from keras import backend as K
 from keras.utils import plot_model
-from Heartnet import heartnet, getAttentionModel
+#from Heartnet import heartnet, getAttentionModel
+from HeartResNet import heartnet
 from utils import log_macc, results_log
 from dataLoader import reshape_folds
 from sklearn.metrics import confusion_matrix
@@ -31,6 +32,7 @@ from keras.utils import to_categorical
 import matplotlib.pyplot as plt
 import seaborn as sns
 import Evaluator
+from sklearn.model_selection import train_test_split
 import dataLoader
 sns.set()
 
@@ -68,6 +70,8 @@ if __name__ == '__main__':
         parser.add_argument("--lr", type=float)
         parser.add_argument("--eval",type=bool)
         parser.add_argument("--att",type=bool)
+        parser.add_argument("--reduce",type=float,
+                            help = "percentage of training data to be thrown away")
 
         args = parser.parse_args()
         if args.tune:
@@ -191,6 +195,9 @@ if __name__ == '__main__':
             if(args.dann>0):
                 model_dir = model_dir + 'dann/'
                 log_dir = log_dir + 'dann/'
+        if(args.reduce):
+            model_dir = model_dir + 'reduced/'
+            log_dir = log_dir + 'reduced/'
         if not os.path.exists(model_dir + log_name):
             if not evaluate:
                 os.makedirs(model_dir + log_name)
@@ -220,7 +227,7 @@ if __name__ == '__main__':
         # lr =  0.0012843784 ## After bayesian optimization
 
         ###### lr_decay optimization ######
-        lr_decay =0.0001132885
+        lr_decay = 0.0001132885
         # lr_decay =3.64370733503E-06
         # lr_decay =3.97171548784E-08
         ###################################
@@ -238,6 +245,9 @@ if __name__ == '__main__':
         num_class = 2
 
         x_train, y_train, y_domain, train_parts,x_val, y_val, val_domain, val_parts, val_wav_files = dataLoader.getData(fold_dir,train_domains,test_domains,test_split)
+        if(args.reduce):
+            x_train,_,y_train,_,y_domain,_ = train_test_split(x_train.transpose(),y_train,y_domain,stratify=y_train,test_size = 0.5)
+            x_train = x_train.transpose()
 
         val_files = val_domain
         #Create meta labels and domain labels
@@ -435,7 +445,7 @@ if __name__ == '__main__':
                                 epochs=epochs,
                                 verbose=verbose,
                                 shuffle=True,
-                                callbacks=[modelcheckpnt,hprate,trackLr,time_callback,
+                                callbacks=[modelcheckpnt,lrate,hprate,trackLr,time_callback,
                                            log_macc(val_parts, decision=decision,verbose=verbose,val_files=val_files,wav_files=val_wav_files,checkpoint_name = checkpoint_name),
                                            tensbd, csv_logger],
                                 validation_data=(x_val, [y_val,val_domain]),
