@@ -23,8 +23,16 @@ from CustomTensorBoard import TensorBoard
 from keras.callbacks import LearningRateScheduler, ModelCheckpoint, CSVLogger
 from keras import backend as K
 from keras.utils import plot_model
-#from Heartnet import heartnet, getAttentionModel
-from HeartResNet import heartnet
+
+
+
+from Heartnet import heartnet, getAttentionModel
+#from HeartResNet import heartnet, getAttentionModel
+#from HearSegNet import heartnet, getAttentionModel
+
+
+
+
 from utils import log_macc, results_log
 from dataLoader import reshape_folds
 from sklearn.metrics import confusion_matrix
@@ -201,9 +209,13 @@ if __name__ == '__main__':
         if not os.path.exists(model_dir + log_name):
             if not evaluate:
                 os.makedirs(model_dir + log_name)
+        print("Make sure to mention the val_acc or val_class_acc for checkpointing, make correction in ModelCheckpoint callback in -trainer.py") 
         checkpoint_name = model_dir + log_name + "/" + 'weights.{epoch:04d}-{val_class_acc:.4f}.hdf5'
         results_path = '../../results_2class.csv'
-        outlayer = 'class'
+        print("Make sure to mention the Output layer name in - trainer.py")
+        outlayer = 'class_'
+        val_outlayer_acc = 'val_'+outlayer+'acc'
+        print(val_outlayer_acc)
 
         num_filt = (8, 4)
         num_dense = 20
@@ -246,15 +258,19 @@ if __name__ == '__main__':
 
         x_train, y_train, y_domain, train_parts,x_val, y_val, val_domain, val_parts, val_wav_files = dataLoader.getData(fold_dir,train_domains,test_domains,test_split)
         if(args.reduce):
-            x_train,_,y_train,_,y_domain,_ = train_test_split(x_train.transpose(),y_train,y_domain,stratify=y_train,test_size = 0.5)
+            print("Reduction ", args.reduce)
+            x_train,_,y_train,_,y_domain,_ = train_test_split(x_train.transpose(),y_train,y_domain,stratify=y_train,test_size = args.reduce)
             x_train = x_train.transpose()
 
+            #x_val,_,y_val,_,val_domain,_ = train_test_split(x_val.transpose(),y_val,val_domain,stratify=y_val,test_size = args.reduce)
+            #x_val = x_val.transpose()
+            
         val_files = val_domain
         #Create meta labels and domain labels
         domains = train_domains
         if(test_split>0):
             domains = domains + test_domains
-        if(args.dann):
+        elif(args.dann):
             domains = domains + test_domains
         domainClass = [(cls,dfc) for cls in range(2) for dfc in domains]
         if(args.dann):
@@ -268,6 +284,7 @@ if __name__ == '__main__':
 
         ################### Reshaping ############
         if(args.dann):
+            print("x_val is added to training without labels")
             x_train = np.concatenate((x_train,x_val),axis=1)
             y_domain= np.concatenate((y_domain,val_domain))
         [x_train, x_val], [y_train,y_domain,y_val] = reshape_folds([x_train,x_val],[y_train,y_domain,y_val])
@@ -301,28 +318,25 @@ if __name__ == '__main__':
             print("Testing")
             print("Testing")
 
-            weight = 'weights.0155-0.5229.hdf5'
-            logname = 'abcdefgh_i_tune_0.3 Tuned 30 2019-09-26 14:24:11.245075'
-            load_path = '../../Adversarial Heart Sound Results/models/'
-            load_path = load_path +logname + '/' + weight
+            load_path = '../../Adversarial Heart Sound Results/models/dann/bcdefghi_a 2019-11-02 17:37:44.337530/weights.0012-0.6994.hdf5'
+
             model = heartnet(load_path,activation_function, bn_momentum, bias, dropout_rate, dropout_rate_dense,
-                         eps, kernel_size, l2_reg, l2_reg_dense, lr, lr_decay, maxnorm,
-                         padding, random_seed, subsam, num_filt, num_dense, FIR_train, trainable, type,num_class=num_class,num_class_domain=num_class_domain,hp_lambda=hp_lambda)
-            y_pred,y_predDom = model.predict(x_val, verbose=verbose)
-            Evaluator.eval(y_val,y_pred,y_predDom,val_parts,val_files,val_wav_files,foldname)
+                             eps, kernel_size, l2_reg, l2_reg_dense, lr, lr_decay, maxnorm,
+                             padding, random_seed, subsam, num_filt, num_dense, FIR_train, trainable, type,
+                             num_class=num_class,num_class_domain=num_class_domain,hp_lambda=hp_lambda,batch_size=batch_size,optim=optim)
+            y_pred,y_pred_domain = model.predict(x_val, verbose=verbose)
+            Evaluator.eval(y_val,y_pred,y_pred_domain,val_parts,val_files,val_wav_files,foldname)
         else:
             print("Training")
             print("Training")
             print("Training")
             print("Training")
 
-
+            #load_path = '../../Adversarial Heart Sound Results/models/dann/bcdefghi_a 2019-11-02 17:37:44.337530/weights.0012-0.6994.hdf5'
             model = heartnet(load_path,activation_function, bn_momentum, bias, dropout_rate, dropout_rate_dense,
                              eps, kernel_size, l2_reg, l2_reg_dense, lr, lr_decay, maxnorm,
                              padding, random_seed, subsam, num_filt, num_dense, FIR_train, trainable, type,
-                             num_class=num_class,num_class_domain=num_class_domain,hp_lambda=hp_lambda,batch_size=batch_size)
-            if(attention):
-                model = getAttentionModel(model,foldname,lr,lr_decay)
+                             num_class=num_class,num_class_domain=num_class_domain,hp_lambda=hp_lambda,batch_size=batch_size,optim=optim)
 
             model.summary()
             plot_model(model, to_file='model.png', show_shapes=True)
@@ -333,7 +347,7 @@ if __name__ == '__main__':
         ####### Define Callbacks ######
 
             modelcheckpnt = ModelCheckpoint(filepath=checkpoint_name,
-                                            monitor='val_class_acc',save_best_only=False, mode='max') 
+                                            monitor=val_outlayer_acc,save_best_only=False, mode='max') 
             tensbd = TensorBoard(log_dir=log_dir + log_name,
                                  batch_size=batch_size, histogram_freq = 3,
                                  write_grads=True,
@@ -356,16 +370,31 @@ if __name__ == '__main__':
                 return lrate
             lrate = LearningRateScheduler(step_decay,verbose = 1)
             # Lambda for gradient reversal layer
-            def f_hp_decay(epoch):
-                minEpoch = 100
+            def f_hp_anneal(epoch):
+                minEpoch = 150
                 if hp_lambda == 0:
                     return hp_lambda
-                #f epoch<minEpoch:
-                    #eturn np.float32(hp_lambda)
+            #     if epoch<minEpoch:
+            #         return np.float32(0.0)
                 gamma =  4
                 p = (epoch) / (epochs)
-                lam =  (2 / (1 + 1*(math.e ** (- gamma * p)))) - 1+.01  # 3 porjonto jaabe
+                lam =  (5 / (1 + 1*(math.e ** (- gamma * p)))) - 1+hp_lambda  
+                lam = lam*(epoch%50<10)
                 # hp_lambda = hp_lambda * (params['hp_decay_const'] ** global_epoch_counter)
+                
+                return np.float32(lam)
+            def f_hp_anneal(epoch):
+                minEpoch = 150
+                if hp_lambda == 0:
+                    return hp_lambda
+                #     if epoch<minEpoch:
+                #         return np.float32(0.0)
+                gamma =  4
+                p = (epoch) / (epochs)
+                lam =  (8 / (2 + 3*(math.e ** (- gamma * p)))) - 1+hp_lambda  # 3 porjonto jaabe
+                lam = lam*(epoch%50<10)
+                # hp_lambda = hp_lambda * (params['hp_decay_const'] ** global_epoch_counter)
+
                 return np.float32(lam)
             class hpRateScheduler(Callback):
                 """Learning rate scheduler.
@@ -380,20 +409,21 @@ if __name__ == '__main__':
                     self.schedule = schedule
                     self.verbose = verbose
                 def on_epoch_begin(self, epoch,logs=None):
-                    hp_lambda = self.schedule(epoch)
-                    if not isinstance(hp_lambda, (float, np.float32, np.float64)):
+                    self_hp_lambda = self.schedule(epoch)
+                    if not isinstance(self_hp_lambda, (float, np.float32, np.float64)):
                         raise ValueError('The output of the "schedule" function '
                                          'should be float.')
                     # K.set_value(self.model.layers[-3].hp_lambda, hp_lambda)
-                    try:
-                        self.model.get_layer('grl').hp_lambda  = hp_lambda
-                        if self.verbose > 0:
-                            print('\nEpoch %05d: HP setting hp_lambda '
-                                  'rate to %s.' % (epoch + 1, hp_lambda))
-                    except:
-                        print("Gradient reversal layer is not added")
+                    print(self.model.get_layer('grl'))
+                    # try:
+                    print("Lambda Cilo ", self.model.get_layer('grl').hp_lambda)
+                    self.model.get_layer('grl').hp_lambda  = self_hp_lambda
+                    if self.verbose > 0:
+                        print('\nEpoch %05d: HP setting hp_lambda rate to %s , %s.' % (epoch + 1, self_hp_lambda,self.model.get_layer('grl').hp_lambda))
+                    # except:
+                    #     print("Gradient reversal layer is not added")
                     
-            hprate = hpRateScheduler(f_hp_decay,verbose = 1)
+            hprate = hpRateScheduler(f_hp_anneal,verbose = 1)
             class MyCallback(Callback):
                 def on_epoch_begin(self, epoch, logs=None):
                     lr = self.model.optimizer.lr
@@ -445,10 +475,10 @@ if __name__ == '__main__':
                                 epochs=epochs,
                                 verbose=verbose,
                                 shuffle=True,
-                                callbacks=[modelcheckpnt,lrate,hprate,trackLr,time_callback,
-                                           log_macc(val_parts, decision=decision,verbose=verbose,val_files=val_files,wav_files=val_wav_files,checkpoint_name = checkpoint_name),
+                                callbacks=[hprate,trackLr,time_callback,
+                                           log_macc(val_parts, decision=decision,verbose=verbose,val_files=val_files,wav_files=val_wav_files,checkpoint_name = checkpoint_name),modelcheckpnt,
                                            tensbd, csv_logger],
-                                validation_data=(x_val, [y_val,val_domain]),
+                                validation_data=(x_val,[y_val,val_domain]),
                                 initial_epoch=initial_epoch,
                                 )
 
