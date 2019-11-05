@@ -12,3 +12,8 @@ bcdefghi,a,0,1,0
 bcdefghi,a,1,0,0
 bcdefghi,a,1,1,0
 python trainer.py gh --epochs 400 --dann 0.01;python trainer.py i --epochs 400 --tune 0.3 --dann 0.01;python trainer.py a --epochs 200;python trainer.py a --epochs 400 --dann 0.01; python trainer.py a --epochs 400 --tune 0.3 --dann 0.01;,,,,
+,,,,
+,,,,
+,,,,
+,,,,
+check the data length of diffaerent folds . may be 2500 values have different length of zeros for different folds,,,,
