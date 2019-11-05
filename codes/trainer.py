@@ -80,6 +80,8 @@ if __name__ == '__main__':
         parser.add_argument("--att",type=bool)
         parser.add_argument("--reduce",type=float,
                             help = "percentage of training data to be thrown away")
+        parser.add_argument("--fixed", type=bool,
+                            help = "If true revers layer parameter lambda doesn't run the scheduler. it stays constant")
 
         args = parser.parse_args()
         if args.tune:
@@ -385,6 +387,8 @@ if __name__ == '__main__':
                 return np.float32(lam)
             def f_hp_anneal(epoch):
                 minEpoch = 150
+                if(args.fixed):
+                    return hp_lambda
                 if hp_lambda == 0:
                     return hp_lambda
                 #     if epoch<minEpoch:
