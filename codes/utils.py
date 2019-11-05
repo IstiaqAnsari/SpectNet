@@ -29,7 +29,10 @@ class log_macc(Callback):
     def on_epoch_end(self, epoch, logs):
         eps = 1.1e-5
         if logs is not None:
-            y_pred,y_predDom = self.model.predict(self.validation_data[0], verbose=self.verbose)
+            y_pred = self.model.predict(self.validation_data[0], verbose=self.verbose)
+            if isinstance(y_pred, list):
+                y_pred_domain = y_pred[1]
+                y_pred = y_pred[0]
             true = []
             pred = []
             files = []
@@ -102,7 +105,12 @@ class log_macc(Callback):
             logs['val_precision'] = np.array(precision)
             logs['val_F1'] = np.array(F1)
             logs['val_macc'] = np.array(Macc)
-            logs['model_path'] = self.checkpoint_name.format(epoch=epoch+1, val_class_acc=logs['val_class_acc'])   ## added one with epoch for correct indexing
+
+            
+            if('val_class_acc' in logs.keys()):
+                logs['model_path'] = self.checkpoint_name.format(epoch=epoch+1, val_class_acc=logs['val_class_acc'])   ## added one with epoch for correct indexing
+            elif('val_acc' in logs.keys()):
+                logs['model_path'] = self.checkpoint_name.format(epoch=epoch+1, val_acc=logs['val_acc'])   ## added one with epoch for correct indexing
             if self.verbose:
                 print("TN:{},FP:{},FN:{},TP:{},Macc:{},F1:{}".format(TN, FP, FN, TP,Macc,F1))
 
@@ -139,8 +147,6 @@ def results_log(results_path,log_dir,log_name,activation_function,addweights,ker
     max_idx = df1['val_macc'].idxmax()
     print("#"*200)
     print(df1.columns)
-    if(outlayer is not ''):
-      outlayer = outlayer+"_"
     val_acc = "val_"+outlayer+"acc"
     acc = outlayer + "acc"
     new_entry = {'Filename': log_name, 'Weight Initialization': 'he_normal',
