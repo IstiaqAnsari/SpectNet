@@ -6,7 +6,7 @@ from __future__ import print_function, division, absolute_import
 # set_session(tf.Session(config=config))
 # from clr_callback import CyclicLR
 # import dill
-from BalancedDannAudioDataGenerator import BalancedAudioDataGenerator
+from BalancedDannAudioDataGenerator import BalancedAudioDataGenerator, AudioDataGenerator
 import os,time
 from scipy.io import loadmat
 import numpy as np
@@ -26,13 +26,14 @@ from keras.utils import plot_model
 
 
 
-from Heartnet import heartnet, getAttentionModel
-#from HeartResNet import heartnet, getAttentionModel
-#from HearSegNet import heartnet, getAttentionModel
+# from Heartnet import heartnet, getAttentionModel
+# from HeartResNet import heartnet, getAttentionModel
+# from HeartSegNet import heartnet, getAttentionModel
+# from SmallNet import heartnet, getAttentionModel
 
 
 
-
+from collections import Counter
 from utils import log_macc, results_log
 from dataLoader import reshape_folds
 from sklearn.metrics import confusion_matrix
@@ -81,7 +82,10 @@ if __name__ == '__main__':
         parser.add_argument("--reduce",type=float,
                             help = "percentage of training data to be thrown away")
         parser.add_argument("--fixed", type=bool,
-                            help = "If true revers layer parameter lambda doesn't run the scheduler. it stays constant")
+                            help = "If true reverse layer parameter lambda doesn't run the scheduler. it stays constant")
+        parser.add_argument("--self",type=bool, help = "If true model train and tests on same data with split")
+        parser.add_argument("--balanced",type=bool, help = "If true model trains with BalancedAudioDataGenerator")
+        parser.add_argument("--segment", type=int, help = "0 = old dataset, 1 = 2500 samples, 2 = repeated beats")
 
         args = parser.parse_args()
         if args.tune:
@@ -105,6 +109,9 @@ if __name__ == '__main__':
             foldname = train_domains+"_"+test_domains
         else:
             foldname = train_domains+"_"+test_domains+"_tune_"+str(test_split)
+        if(args.self):
+            foldname = args.test_domains
+
         print("%s selected for training" % (train_domains))
         print("%s selected for validation" % (test_domains))
         print(foldname)
@@ -120,7 +127,6 @@ if __name__ == '__main__':
 
         if args.loadmodel:  # If a previously trained model is loaded for retraining
             load_path = args.loadmodel  #### path to model to be loaded
-
             idx = load_path.find("weights")
             initial_epoch = int(load_path[idx + 8:idx + 8 + 4])
 
@@ -174,6 +180,23 @@ if __name__ == '__main__':
         else:
             hp_lambda = np.float32(0)
 
+        ###################  NETWORK #############################
+
+        network = 'SmallNet'
+        if(network == 'heartnet'):
+            from Heartnet import heartnet, getAttentionModel
+        elif(network =='SmallNet'):
+            from SmallNet import heartnet, getAttentionModel
+        elif(network=='HeartResNet'):
+            from HeartResNet import heartnet, getAttentionModel
+        elif(network=='HeartSegNet'):
+            from HeartSegNet import heartnet, getAttentionModel
+        else:
+            print("Please define network")
+            exit(0)
+
+
+
         #########################################################
 
         foldname = foldname
@@ -184,19 +207,40 @@ if __name__ == '__main__':
         batch_size = batch_size
         verbose = verbose
         type = type
+        print("Attention" *10)
+        print("Attention" *10)
+        print("Make sure to select the right fold to use")
 
-
-        model_dir = '../../Adversarial Heart Sound Results/models/'
+        seg = {0:'zeropad',1:'2500sam',2:'repeated'}
+        directory = {0:'../../feature/potes_1DCNN/balancedCV/folds/all_folds_wav_name/', 
+                     1:'../../feature/potes_1DCNN/balancedCV/folds/all_folds_wav_name/', 
+                     2:'../../feature/potes_1DCNN/balancedCV/folds/individual_fold_beats_repeated/'}
         #fold_dir = '../../feature/potes_1DCNN/balancedCV/folds/folds_phys_compare_pascal/'
-        fold_dir = '../../feature/potes_1DCNN/balancedCV/folds/all_folds_wav_name/'
+        #fold_dir = '../../feature/potes_1DCNN/balancedCV/folds/all_folds_wav_name/'
+        #fold_dir = '../../feature/potes_1DCNN/balancedCV/folds/individual_fold_2500_samples/'
+        #fold_dir = '../../feature/potes_1DCNN/balancedCV/folds/individual_fold_beats_repeated/'
+        if(args.segment):
+            fold_dir = directory[args.segment]
+        else:
+            fold_dir = directory[0]
+            print("Working with previous zero padded data")
 
         if(test_split>0):
-            log_name = foldname +' Tuned '+str(int(test_split*100))+' '+ str(datetime.now())
+            if(args.balanced is not None):
+                log_name = foldname +' Tuned '+seg[args.segment]+' '+'unbalanced '+str(int(test_split*100))+' '+ str(batch_size)+' '+str(datetime.now())
+            else:
+                log_name = foldname +' Tuned '+seg[args.segment]+' '+str(int(test_split*100))+' '+ str(batch_size)+' '+str(datetime.now())
         else:
-            log_name = foldname + ' ' + str(datetime.now())
+            if(args.balanced is not None):
+                log_name = foldname + ' ' +seg[args.segment]+' '+ str(batch_size)+' '+ str(datetime.now())
+            else:
+                log_name = foldname + ' ' +seg[args.segment]+' '+ str(batch_size)+' '+ str(datetime.now())
+        model_dir = '../../Adversarial Heart Sound Results/models/'+network+'/'
+        log_dir = '../../Adversarial Heart Sound Results/logs/'+network+'/'
 
-        log_dir = '../../Adversarial Heart Sound Results/logs/'
-
+        if(args.self):
+            model_dir = model_dir + 'self_train/'
+            log_dir = log_dir + 'self_train/'
         if(attention):
             print("Training with Attention layer")
             model_dir = model_dir + 'attention/'
@@ -208,6 +252,7 @@ if __name__ == '__main__':
         if(args.reduce):
             model_dir = model_dir + 'reduced/'
             log_dir = log_dir + 'reduced/'
+        
         if not os.path.exists(model_dir + log_name):
             if not evaluate:
                 os.makedirs(model_dir + log_name)
@@ -255,10 +300,15 @@ if __name__ == '__main__':
 
         ############## Importing data ############
 
-        num_class_domain = len(set(train_domains + test_domains))
+        domains = set(train_domains + test_domains)
+        #num_class_domain = len(set(train_domains + test_domains))
+        num_class_domain = len(domains)
         num_class = 2
+        if(args.self):
+            x_train, y_train, y_domain, train_parts,x_val, y_val, val_domain, val_parts, val_wav_files = dataLoader.getData(fold_dir,'',test_domains,0.7)
+        else:
+            x_train, y_train, y_domain, train_parts,x_val, y_val, val_domain, val_parts, val_wav_files = dataLoader.getData(fold_dir,train_domains,test_domains,test_split)
 
-        x_train, y_train, y_domain, train_parts,x_val, y_val, val_domain, val_parts, val_wav_files = dataLoader.getData(fold_dir,train_domains,test_domains,test_split)
         if(args.reduce):
             print("Reduction ", args.reduce)
             x_train,_,y_train,_,y_domain,_ = train_test_split(x_train.transpose(),y_train,y_domain,stratify=y_train,test_size = args.reduce)
@@ -266,23 +316,31 @@ if __name__ == '__main__':
 
             #x_val,_,y_val,_,val_domain,_ = train_test_split(x_val.transpose(),y_val,val_domain,stratify=y_val,test_size = args.reduce)
             #x_val = x_val.transpose()
-            
+
         val_files = val_domain
         #Create meta labels and domain labels
         domains = train_domains
         if(test_split>0):
+            #domains = "".join(set(domains).union(set(test_domains)))
             domains = domains + test_domains
         elif(args.dann):
+            #domains = "".join(set(domains).union(set(test_domains)))
             domains = domains + test_domains
+
+        if(args.self):
+            print("self training")
+            domains = test_domains
+            num_class_domain = len(set(domains))
+
         domainClass = [(cls,dfc) for cls in range(2) for dfc in domains]
         if(args.dann):
             meta_labels = [domainClass.index((cl,df)) for (cl,df) in zip(np.concatenate((y_train,y_val)),(y_domain+val_domain))]
         else:
             meta_labels = [domainClass.index((cl,df)) for (cl,df) in zip(y_train,y_domain)]
 
-        y_domain = np.array([list(set(train_domains+test_domains)).index(lab) for lab in y_domain])
+        y_domain = np.array([list(domains).index(lab) for lab in y_domain])
 
-        val_domain = np.array([list(set(train_domains+test_domains)).index(lab) for lab in val_domain])
+        val_domain = np.array([list(domains).index(lab) for lab in val_domain])
 
         ################### Reshaping ############
         if(args.dann):
@@ -293,15 +351,14 @@ if __name__ == '__main__':
         y_train = to_categorical(y_train, num_classes=num_class)
         if(args.dann):
             y_train = np.concatenate((y_train,np.zeros((y_val.shape[0],2))))
+        print("Y domain ", Counter([x[0] for x in y_domain]))
+        print("Val domain ", Counter(val_domain))
+        print("Meta labels ", Counter(meta_labels))
         y_domain = to_categorical(y_domain,num_classes=num_class_domain)
         y_val = to_categorical(y_val, num_classes=num_class)
         val_domain = to_categorical(val_domain,num_classes=num_class_domain)
-        print("Train  files ", y_train.shape, "  Domain ", y_domain.shape)
-
-
-
-
-
+        print("Train files ", y_train.shape, "  Domain ", y_domain.shape)
+        print("Test files ", y_val.shape, "  Domain ", val_domain.shape)
 
 
         
@@ -334,7 +391,7 @@ if __name__ == '__main__':
             print("Training")
             print("Training")
 
-            #load_path = '../../Adversarial Heart Sound Results/models/dann/bcdefghi_a 2019-11-02 17:37:44.337530/weights.0012-0.6994.hdf5'
+            #load_path = '../../Adversarial Heart Sound Results/models/SmallNet/self_train/abcdef 2019-11-13 12:16:32.746063/weights.0164-0.6864.hdf5'
             model = heartnet(load_path,activation_function, bn_momentum, bias, dropout_rate, dropout_rate_dense,
                              eps, kernel_size, l2_reg, l2_reg_dense, lr, lr_decay, maxnorm,
                              padding, random_seed, subsam, num_filt, num_dense, FIR_train, trainable, type,
@@ -363,7 +420,10 @@ if __name__ == '__main__':
             ## learning rate 
             def step_decay(epoch):
                 
-                lr0 = .00128437
+                if(args.lr is None):
+                    lr0 = .00128437
+                else:
+                    lr0 = args.lr
                 #print("learning rate , lr 0 ", lr, lr0)
                 a = 1
                 b = 1
@@ -371,6 +431,8 @@ if __name__ == '__main__':
                 lrate = lr0/math.pow((1+a*p),b)
                 return lrate
             lrate = LearningRateScheduler(step_decay,verbose = 1)
+
+
             # Lambda for gradient reversal layer
             def f_hp_anneal(epoch):
                 minEpoch = 150
@@ -449,8 +511,21 @@ if __name__ == '__main__':
                     print("Epoch Time : ",time.time() - self.epoch_time_start)
             time_callback = TimeHistory()
             ######### Data Generator ############
-            datagen = BalancedAudioDataGenerator(
-                                         shift=.1,
+            if(args.balanced is not None):
+                print("Un Balanced generator")
+                datagen = AudioDataGenerator(shift=.1)
+                flow = datagen.flow(x_train, [y_train,y_domain],
+                                batch_size=batch_size, shuffle=True,
+                                seed=random_seed)
+            else:
+                print("Balanced generator")
+                datagen = BalancedAudioDataGenerator(shift=.1)
+                flow = datagen.flow(x_train, [y_train,y_domain],
+                                meta_label=meta_labels,
+                                batch_size=batch_size, shuffle=True,
+                                seed=random_seed)
+            # datagen = AudioDataGenerator(
+                                         # shift=.1,
                                          # roll_range=.1,
                                          # fill_mode='reflect',
                                          # featurewise_center=True,
@@ -458,7 +533,7 @@ if __name__ == '__main__':
                                          # zca_whitening=True,
                                          # samplewise_center=True,
                                          # samplewise_std_normalization=True,
-                                         )
+                                         # )
             # valgen = AudioDataGenerator(
             #     # fill_mode='reflect',
             #     # featurewise_center=True,
@@ -467,19 +542,19 @@ if __name__ == '__main__':
             #     # samplewise_center=True,
             #     # samplewise_std_normalization=True,
             # )
-            flow = datagen.flow(x_train, [y_train,y_domain],
-                                meta_label=meta_labels,
-                                batch_size=batch_size, shuffle=True,
-                                seed=random_seed)
+            # flow = datagen.flow(x_train, [y_train,y_domain],
+            #                     meta_label=meta_labels,
+            #                     batch_size=batch_size, shuffle=True,
+            #                     seed=random_seed)
             model.fit_generator(flow,
-                                #steps_per_epoch=len(x_train) // batch_size,
-                                steps_per_epoch=flow.steps_per_epoch,
+                                steps_per_epoch=len(x_train) // batch_size,
+                                #steps_per_epoch=flow.steps_per_epoch,
                                 # max_queue_size=20,
                                 use_multiprocessing=False,
                                 epochs=epochs,
                                 verbose=verbose,
                                 shuffle=True,
-                                callbacks=[hprate,trackLr,time_callback,
+                                callbacks=[hprate,lrate,time_callback,
                                            log_macc(val_parts, decision=decision,verbose=verbose,val_files=val_files,wav_files=val_wav_files,checkpoint_name = checkpoint_name),modelcheckpnt,
                                            tensbd, csv_logger],
                                 validation_data=(x_val,[y_val,val_domain]),
