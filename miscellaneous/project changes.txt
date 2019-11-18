@@ -1,0 +1,5 @@
+before : Unsupervised , test data is totally unseen. 
+
+oct 30 : NOW RUNNING SEMI SUPERVISED. MEANING TEST DATA IS SHOWN BUT WITHOUT LABELS
+
+nov 6  : Data is normalized in data holder. previsouly wasn't
