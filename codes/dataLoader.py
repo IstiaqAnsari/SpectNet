@@ -83,9 +83,9 @@ def getData(fold_dir, train_folds, test_folds, split = 0, shuffle = None):
 
     allData = DataMerge(split)
     for c in test_folds:
-        allData.merge(Data(fold_dir,foldname[c],c,severe = False,split=split,shuffle),True)
+        allData.merge(Data(fold_dir,foldname[c],c,severe = False,split=split,shuffle=shuffle),True)
     for c in train_folds:
-        allData.merge(Data(fold_dir,foldname[c],c,shuffle),False)
+        allData.merge(Data(fold_dir,foldname[c],c,shuffle=shuffle),False)
     allData.showDistribution()
     return allData.x_train, allData.y_train, allData.y_domain, allData.train_parts,allData.x_val,allData.y_val,allData.y_valdom,allData.val_parts,allData.val_wav_name
 
