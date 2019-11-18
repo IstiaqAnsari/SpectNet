@@ -86,6 +86,7 @@ if __name__ == '__main__':
         parser.add_argument("--self",type=bool, help = "If true model train and tests on same data with split")
         parser.add_argument("--balanced",type=bool, help = "If true model trains with BalancedAudioDataGenerator")
         parser.add_argument("--segment", type=int, help = "0 = old dataset, 1 = 2500 samples, 2 = repeated beats")
+        parser.add_argument("--shuffle", type=int, help = "0 = old dataset, 1 = 2500 samples, 2 = repeated beats")
 
         args = parser.parse_args()
         if args.tune:
@@ -305,9 +306,9 @@ if __name__ == '__main__':
         num_class_domain = len(domains)
         num_class = 2
         if(args.self):
-            x_train, y_train, y_domain, train_parts,x_val, y_val, val_domain, val_parts, val_wav_files = dataLoader.getData(fold_dir,'',test_domains,0.7)
+            x_train, y_train, y_domain, train_parts,x_val, y_val, val_domain, val_parts, val_wav_files = dataLoader.getData(fold_dir,'',test_domains,0.7,shuffle=args.shuffle)
         else:
-            x_train, y_train, y_domain, train_parts,x_val, y_val, val_domain, val_parts, val_wav_files = dataLoader.getData(fold_dir,train_domains,test_domains,test_split)
+            x_train, y_train, y_domain, train_parts,x_val, y_val, val_domain, val_parts, val_wav_files = dataLoader.getData(fold_dir,train_domains,test_domains,test_split,shuffle = args.shuffle)
 
         if(args.reduce):
             print("Reduction ", args.reduce)
