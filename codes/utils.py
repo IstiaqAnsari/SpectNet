@@ -5,7 +5,7 @@ np.random.seed(1)
 from tensorflow import set_random_seed
 set_random_seed(1)
 import pandas as pd
-from keras.callbacks import  Callback, ReduceLROnPlateau
+from keras.callbacks import  Callback, ReduceLROnPlateau,LearningRateScheduler
 from keras.optimizers import Adam
 from sklearn.metrics import confusion_matrix
 from keras import backend as K
@@ -30,6 +30,8 @@ class log_macc(Callback):
         eps = 1.1e-5
         if logs is not None:
             y_pred = self.model.predict(self.validation_data[0], verbose=self.verbose)
+
+            # Handling multiple outputs of model and taking into account only the classifier
             if isinstance(y_pred, list):
                 y_pred_domain = y_pred[1]
                 y_pred = y_pred[0]
@@ -100,12 +102,13 @@ class log_macc(Callback):
             precision = TP / (TP + FP + eps)
             F1 = 2 * (precision * sensitivity) / (precision + sensitivity + eps)
             Macc = (sensitivity + specificity) / 2
+            logs['learning_rate'] = K.get_value(self.model.optimizer.lr)
             logs['val_sensitivity'] = np.array(sensitivity)
             logs['val_specificity'] = np.array(specificity)
             logs['val_precision'] = np.array(precision)
             logs['val_F1'] = np.array(F1)
             logs['val_macc'] = np.array(Macc)
-
+            logs['acc_wav'] = np.array((TN+TP)/(TN+TP+FP+FN))
             
             if('val_class_acc' in logs.keys()):
                 logs['model_path'] = self.checkpoint_name.format(epoch=epoch+1, val_class_acc=logs['val_class_acc'])   ## added one with epoch for correct indexing
@@ -188,3 +191,4 @@ def Confused_Crossentropy(y_true, y_pred):
     #y_predfused = tf.convert_to_tensor((np.ones((batch,num_class),dtype=np.float32)*0.5))
     #y_truefused = tf.convert_to_tensor( to_categorical(np.ones(batch),num_class) )
     return K.abs(K.categorical_crossentropy(y_true, y_pred)-K.categorical_crossentropy(y_true,y_predfused))
+
