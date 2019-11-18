@@ -1,7 +1,9 @@
 import matplotlib.pyplot as plt,h5py,numpy as np
 from collections import Counter
+import matplotlib.pyplot as plt,h5py,numpy as np
+from collections import Counter
 class Data():
-    def __init__(self,path,f,n,severe = False,split=0):
+    def __init__(self,path,f,n,severe = True,split=0,normalize=False,shuffle=None):
         
         if(split>=1 or split<0):
             print("make sure split follow  1<split<=0 ")
@@ -20,16 +22,51 @@ class Data():
         self.valdomY = None
         self.val_parts = None
         self.domainY = [n]*self.trainY.shape[0]
-        if(f[:3]=='com'):self.processCompare(severe) ### select severe files only
-        else:
-            self.trainY[self.trainY<0] = 0   
+        
+        ##calculate the normal and abnormal beats count
         self.normal = Counter(self.trainY)[0]
         self.abnormal = Counter(self.trainY)[1]
         self.total = self.normal+self.abnormal
         self.normfiles, self.abnormfiles = self.parts() 
-        if('fold_e' in f):self.processE()
-        if(split>0):self.split_data(split)
         
+        if(f[:3]=='com'):self.processCompare(severe) ### select severe files only
+        else:
+            self.trainY[self.trainY<0] = 0   
+        if('fold_e' in f):self.processE()
+        if(shuffle is not None):self.shuffle_data(shuffle)
+        if(split>0):self.split_data(split)
+        if(normalize):self.normalize_data()
+            
+        
+    def shuffle_data(self,seed=0):
+        ## The shuffle parameter is None in init(). but if provided and int value it will be
+        ## used as the random seed
+        if(self.trainX is not None):
+            xx = self.trainX.copy()
+            yy = self.trainY.copy()
+            pr = [x for x in range(len(self.train_parts))]
+            random.Random(seed).shuffle(pr)
+            s = 0
+            for i,x in enumerate(pr):
+                xx[:,s:s+self.train_parts[x]] = self.trainX[:,sum(self.train_parts[:x]):sum(self.train_parts[:x])+self.train_parts[x]]
+                yy[s:s+self.train_parts[x]] = self.trainY[sum(self.train_parts[:x]):sum(self.train_parts[:x])+self.train_parts[x]]
+                s = s+self.train_parts[x]
+            self.train_parts = self.train_parts[pr]
+            self.wav_name = [self.wav_name[pr[x]] for x in range(len(self.wav_name))]
+        if(self.valX is not None):
+            xx = self.valX.copy()
+            yy = self.valY.copy()
+            pr = [x for x in range(len(self.val_parts))]
+            random.Random(seed).shuffle(pr)
+            s = 0
+            for i,x in enumerate(pr):
+                xx[:,s:s+self.train_parts[x]] = self.valX[:,sum(self.train_parts[:x]):sum(self.train_parts[:x])+self.train_parts[x]]
+                yy[s:s+self.train_parts[x]] = self.valY[sum(self.train_parts[:x]):sum(self.train_parts[:x])+self.train_parts[x]]
+                s = s+self.train_parts[x]
+            self.train_parts = self.val_parts[pr]
+            self.val_wav_name = [self.val_wav_name[pr[x]] for x in range(len(self.val_wav_name))]
+    def normalize_data(self):
+        self.trainX = np.array([x/(max(abs(x)+10e-6)) for x in self.trainX.transpose()]).transpose()
     def split_data(self,split):
         if(self.file[:3]=='com'):
             self.valX = self.data['valX'][:]
@@ -78,20 +115,21 @@ class Data():
         del tmpX,tmpY,parts
     def processCompare(self,severe):
         if(severe):
-            print("Wrong implementation, normal = 0, mild = 1, sever = 2. mild is being selected")
+            print("fixed implementation, normal = 0, mild = 1, sever = 2. mild is being selected")
             self.sevX = None
-            self.sevY = self.trainY[self.trainY<2]
+            self.sevY = self.trainY[self.trainY%2==0]
             self.sev_parts = []
             self.sev_wav_name = []
             left = int(0)
             for j,x in enumerate(self.train_parts):
                 x = int(x)
-                if(all([i==2 for i in self.trainY[left:x+left]])):
+                if(all([i%2==0 for i in self.trainY[left:x+left]])):
                     if(self.sevX is None):
                         self.sevX = self.trainX[:,left:x+left]
                     else: 
                         self.sevX = np.concatenate((self.sevX,self.trainX[:,left:x+left]),axis=1)
-                else:self.sev_parts.append(x)
+                    self.sev_parts.append(x)
+                    self.sev_wav_name.append(self.wav_name[j])
                 left = x + left
                 
             self.trainX = self.sevX
