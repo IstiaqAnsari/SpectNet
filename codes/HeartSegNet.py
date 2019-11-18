@@ -111,7 +111,7 @@ def heartnet(load_path,activation_function='relu', bn_momentum=0.99, bias=False,
     input4 = Conv1D_linearphaseType(1, 60, use_bias=False,
                     # kernel_initializer=initializers.he_normal(random_seed),
                     weights=[b4[31:]],
-                    padding='same',trainable=FIR_train, type = type)(inpu4)
+                    padding='same',trainable=FIR_train, type = type)(input4)
 
     #Conv1D_gammatone
 
@@ -132,6 +132,7 @@ def heartnet(load_path,activation_function='relu', bn_momentum=0.99, bias=False,
     merged = Concatenate(axis=-1)([t1, t2, t3, t4])
     # merged = DCT1D()(merged)
     merged = Flatten()(merged)
+    merged = Dropout(rate=dropout_rate, seed=random_seed)(merged)
     # discriminator
     #dann_in = Attention(name='domain_att',trainable=False)(merged)
     #merged = Attention(name = 'class_att',trainable=False)(merged)
@@ -171,8 +172,11 @@ def heartnet(load_path,activation_function='relu', bn_momentum=0.99, bias=False,
         opt = Adam(lr=lr, decay=lr_decay)
     else:  
         opt = SGD(lr=lr,decay=lr_decay)
-    #model.compile(optimizer=opt, loss={'class':'categorical_crossentropy','domain':'categorical_crossentropy'},loss_weights=[1,1], metrics=['accuracy'])
-    model.compile(optimizer=opt, loss=['categorical_crossentropy','categorical_crossentropy'], metrics=['accuracy'])
+    if(num_class_domain>1):
+        domain_loss_function = 'categorical_crossentropy'
+    else:
+        domain_loss_function = 'binary_crossentropy'
+    model.compile(optimizer=opt, loss={'class':'categorical_crossentropy','domain':domain_loss_function}, metrics=['accuracy'])
     
     return model
 

@@ -30,6 +30,17 @@ def branch(input_tensor,num_filt,kernel_size,random_seed,padding,bias,maxnorm,l2
     t = BatchNormalization(epsilon=eps, momentum=bn_momentum, axis=-1)(t)
     t = Activation(activation_function)(t)
     t = Dropout(rate=dropout_rate, seed=random_seed)(t)
+    t = Conv1D(16, kernel_size=kernel_size,
+               kernel_initializer=initializers.he_normal(seed=random_seed),
+               padding=padding,
+               use_bias=bias,
+               trainable=trainable,
+               kernel_constraint=max_norm(maxnorm),
+               kernel_regularizer=l2(l2_reg))(t)
+    t = BatchNormalization(epsilon=eps, momentum=bn_momentum, axis=-1)(t)
+    t = Activation(activation_function)(t)
+    t = Dropout(rate=dropout_rate, seed=random_seed)(t)
+    # t = Flatten()(t)
     return t
 def zeropad(x):
     y = K.zeros_like(x)
@@ -40,7 +51,6 @@ def zeropad_output_shape(input_shape):
     assert len(shape) == 3
     shape[2] *= 2
     return tuple(shape)
-
 def res_block(input_tensor,num_filt,kernel_size,stride,padding,random_seed,bias,maxnorm,l2_reg,
            eps,bn_momentum,activation_function,dropout_rate,subsam,trainable,cat=True):
 
@@ -83,92 +93,27 @@ def heartnet(load_path,activation_function='relu', bn_momentum=0.99, bias=False,
     #num_dense = 20 default 
     input = Input(shape=(2500, 1))
 
-    coeff_path = '../data/filterbankcoeff60.mat'
-    coeff = tables.open_file(coeff_path)
-    b1 = coeff.root.b1[:]
-    b1 = np.hstack(b1)
-    b1 = np.reshape(b1, [b1.shape[0], 1, 1])
-
-    b2 = coeff.root.b2[:]
-    b2 = np.hstack(b2)
-    b2 = np.reshape(b2, [b2.shape[0], 1, 1])
-
-    b3 = coeff.root.b3[:]
-    b3 = np.hstack(b3)
-    b3 = np.reshape(b3, [b3.shape[0], 1, 1])
-
-    b4 = coeff.root.b4[:]
-    b4 = np.hstack(b4)
-    b4 = np.reshape(b4, [b4.shape[0], 1, 1])
-
-    ## Conv1D_linearphase
-
-    # input1 = Conv1D_linearphase(1 ,61, use_bias=False,
-    #                 # kernel_initializer=initializers.he_normal(random_seed),
-    #                 weights=[b1[30:]],
-    #                 padding='same',trainable=FIR_train)(input)
-    # input2 = Conv1D_linearphase(1, 61, use_bias=False,
-    #                 # kernel_initializer=initializers.he_normal(random_seed),
-    #                 weights=[b2[30:]],
-    #                 padding='same',trainable=FIR_train)(input)
-    # input3 = Conv1D_linearphase(1, 61, use_bias=False,
-    #                 # kernel_initializer=initializers.he_normal(random_seed),
-    #                 weights=[b3[30:]],
-    #                 padding='same',trainable=FIR_train)(input)
-    # input4 = Conv1D_linearphase(1, 61, use_bias=False,
-    #                 # kernel_initializer=initializers.he_normal(random_seed),
-    #                 weights=[b4[30:]],
-    #                 padding='same',trainable=FIR_train)(input)
-
-    ## Conv1D_linearphase Anti-Symmetric
-    #
-    input1 = Conv1D_linearphaseType(1 ,60, use_bias=False,
-                    # kernel_initializer=initializers.he_normal(random_seed),
-                    weights=[b1[31:]],
-                    padding='same',trainable=FIR_train, type = type)(input)
-    input2 = Conv1D_linearphaseType(1, 60, use_bias=False,
-                    # kernel_initializer=initializers.he_normal(random_seed),
-                    weights=[b2[31:]],
-                    padding='same',trainable=FIR_train, type = type)(input)
-    input3 = Conv1D_linearphaseType(1, 60, use_bias=False,
-                    # kernel_initializer=initializers.he_normal(random_seed),
-                    weights=[b3[31:]],
-                    padding='same',trainable=FIR_train, type = type)(input)
-    input4 = Conv1D_linearphaseType(1, 60, use_bias=False,
-                    # kernel_initializer=initializers.he_normal(random_seed),
-                    weights=[b4[31:]],
-                    padding='same',trainable=FIR_train, type = type)(input)
-    t1 = branch(input1,num_filt,kernel_size,random_seed,padding,bias,maxnorm,l2_reg,
-           eps,bn_momentum,activation_function,dropout_rate,subsam,trainable)
-    t2 = branch(input2,num_filt,kernel_size,random_seed,padding,bias,maxnorm,l2_reg,
-           eps,bn_momentum,activation_function,dropout_rate,subsam,trainable)
-    t3 = branch(input3,num_filt,kernel_size,random_seed,padding,bias,maxnorm,l2_reg,
-           eps,bn_momentum,activation_function,dropout_rate,subsam,trainable)
-    t4 = branch(input4,num_filt,kernel_size,random_seed,padding,bias,maxnorm,l2_reg,
-           eps,bn_momentum,activation_function,dropout_rate,subsam,trainable)
-    #Conv1D_gammatone
-
-    # input1 = Conv1D_gammatone(kernel_size=81,filters=1,fsHz=1000,use_bias=False,padding='same')(input)
-    # input2 = Conv1D_gammatone(kernel_size=81,filters=1,fsHz=1000,use_bias=False,padding='same')(input)
-    # input3 = Conv1D_gammatone(kernel_size=81,filters=1,fsHz=1000,use_bias=False,padding='same')(input)
-    # input4 = Conv1D_gammatone(kernel_size=81,filters=1,fsHz=1000,use_bias=False,padding='same')(input)
     
-    xx = Concatenate(axis=-1)([t1,t2,t3,t4])
-    
+    xx = branch(input,num_filt,kernel_size,random_seed,padding,bias,maxnorm,l2_reg,
+           eps,bn_momentum,activation_function,dropout_rate,subsam,trainable)
+    xx = branch(input,num_filt,kernel_size,random_seed,padding,bias,maxnorm,l2_reg,
+           eps,bn_momentum,activation_function,dropout_rate,subsam,trainable)
+    xx = res_block(xx,32,kernel_size,2,'same',random_seed,bias,maxnorm,l2_reg,
+           eps,bn_momentum,activation_function,dropout_rate,subsam,trainable)
     xx = res_block(xx,64,kernel_size,2,'same',random_seed,bias,maxnorm,l2_reg,
            eps,bn_momentum,activation_function,dropout_rate,subsam,trainable)
-    xx = res_block(xx,64,kernel_size,1,'same',random_seed,bias,maxnorm,l2_reg,
-           eps,bn_momentum,activation_function,dropout_rate,subsam,trainable)
     
-    xx = res_block(xx,128,kernel_size,3,'same',random_seed,bias,maxnorm,l2_reg,
-           eps,bn_momentum,activation_function,dropout_rate,subsam,trainable)
-    xx = res_block(xx,128,kernel_size,1,'same',random_seed,bias,maxnorm,l2_reg,
-           eps,bn_momentum,activation_function,dropout_rate,subsam,trainable)
+    xx = MaxPooling1D(pool_size=2)(xx)
     
-    xx = res_block(xx,128,kernel_size,2,'same',random_seed,bias,maxnorm,l2_reg,
-           eps,bn_momentum,activation_function,dropout_rate,subsam,trainable,cat=False)
-    xx = res_block(xx,128,kernel_size,2,'same',random_seed,bias,maxnorm,l2_reg,
-           eps,bn_momentum,activation_function,dropout_rate,subsam,trainable,cat=False)
+#     xx = res_block(xx,128,kernel_size,2,'same',random_seed,bias,maxnorm,l2_reg,
+#            eps,bn_momentum,activation_function,dropout_rate,subsam,trainable)
+#     xx = res_block(xx,128,kernel_size,1,'same',random_seed,bias,maxnorm,l2_reg,
+#            eps,bn_momentum,activation_function,dropout_rate,subsam,trainable)
+    
+#     xx = res_block(xx,128,kernel_size,2,'same',random_seed,bias,maxnorm,l2_reg,
+#            eps,bn_momentum,activation_function,dropout_rate,subsam,trainable,cat=False)
+#     xx = res_block(xx,128,kernel_size,2,'same',random_seed,bias,maxnorm,l2_reg,
+#            eps,bn_momentum,activation_function,dropout_rate,subsam,trainable,cat=False)
     
     xx = Conv1D(128, kernel_size=kernel_size,
                 kernel_initializer=initializers.he_normal(seed=random_seed),
@@ -178,11 +123,13 @@ def heartnet(load_path,activation_function='relu', bn_momentum=0.99, bias=False,
                 kernel_constraint=max_norm(maxnorm),
                 trainable=trainable,
                 kernel_regularizer=l2(l2_reg))(xx)
-    
+    xx = MaxPooling1D(pool_size=2)(xx)
     merged = Flatten()(xx)
+    merged = Dropout(rate=dropout_rate, seed=random_seed)(merged)
+    
     
     dann_in = GradientReversal(hp_lambda=hp_lambda,name='grl')(merged)
-    dsc = Dense(50,
+    dsc = Dense(80,
                    activation=activation_function,
                    kernel_initializer=initializers.he_normal(seed=random_seed),
                    use_bias=bias,
@@ -190,7 +137,7 @@ def heartnet(load_path,activation_function='relu', bn_momentum=0.99, bias=False,
                    kernel_regularizer=l2(l2_reg_dense),
                    name = 'domain_dense')(dann_in)   
     dsc = Dense(num_class_domain, activation='softmax', name = "domain")(dsc)          
-    merged = Dense(num_dense,
+    merged = Dense(50,
                    activation=activation_function,
                    kernel_initializer=initializers.he_normal(seed=random_seed),
                    use_bias=bias,
@@ -209,15 +156,17 @@ def heartnet(load_path,activation_function='relu', bn_momentum=0.99, bias=False,
     # models/fold_a_gt 2019-09-04 17:36:52.860817/weights.0200-0.7135.hdf5
     
     if optim=='Adam':
-    	opt = Adam(lr=lr, decay=lr_decay)
+        opt = Adam(lr=lr, decay=lr_decay)
     else:  
-    	opt = SGD(lr=lr,decay=lr_decay)
+        opt = SGD(lr=lr,decay=lr_decay)
     if(num_class_domain>1):
         domain_loss_function = 'categorical_crossentropy'
     else:
         domain_loss_function = 'binary_crossentropy'
-    model.compile(optimizer=opt, loss={'class':'categorical_crossentropy','domain':domain_loss_function}, metrics=['accuracy'])
+    model.compile(optimizer=opt, loss={'class':'categorical_crossentropy','domain':domain_loss_function}, loss_weights=[1,0], metrics=['accuracy'])
+    #model.compile(optimizer=opt, loss={'class':'categorical_crossentropy','domain':'categorical_crossentropy'}, metrics=['accuracy'])
     return model
+
 
 def getAttentionModel(model,foldname,lr,lr_decay):
     load_path = Result(foldname, find = True).df['model_path']
