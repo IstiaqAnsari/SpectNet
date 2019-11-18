@@ -38,11 +38,20 @@ class NumpyArrayIterator(Iterator):
                  data_format=None,
                  save_to_dir=None, save_prefix='', save_format='wav',
                  subset=None):
-        if y is not None and len(x) != len(y):
-            raise ValueError('`x` (audio tensor) and `y` (labels) '
+
+        if y is not None:
+            if(isinstance(y, np.ndarray)):
+                if len(x) != len(y):
+                    raise ValueError('`x` (audio tensor) and `y` (labels) '
                              'should have the same length. '
                              'Found: x.shape = %s, y.shape = %s' %
                              (np.asarray(x).shape, np.asarray(y).shape))
+            elif(isinstance(y, list)):
+                if len(x) != len(y[0]):
+                    raise ValueError('`x` (audio tensor) and `y` (labels) '
+                             'should have the same length. '
+                             'Found: x.shape = %s, y.shape = %s' %
+                             (np.asarray(x).shape, np.asarray(y[0]).shape))
         if subset is not None:
             if subset not in {'training', 'validation'}:
                 raise ValueError('Invalid subset name:', subset,
@@ -74,7 +83,10 @@ class NumpyArrayIterator(Iterator):
                 self.x.shape) +
                           ' (' + str(self.x.shape[channels_axis]) + ' channels).')
         if y is not None:
-            self.y = np.asarray(y)
+            if(isinstance(y,list)):
+              self.y = [np.asarray(each) for each in y]
+            else:
+              self.y = y
         else:
             self.y = None
         self.audio_data_generator = audio_data_generator
@@ -97,7 +109,10 @@ class NumpyArrayIterator(Iterator):
 
         if self.y is None:
             return batch_x
-        batch_y = self.y[index_array]
+        if(isinstance(self.y,list)):
+            batch_y = [each[index_array] for each in self.y]
+        else:
+            batch_y = self.y[index_array]
         return batch_x, batch_y
 
     def next(self):
