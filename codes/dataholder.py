@@ -1,6 +1,4 @@
-import matplotlib.pyplot as plt,h5py,numpy as np
-from collections import Counter
-import matplotlib.pyplot as plt,h5py,numpy as np
+import matplotlib.pyplot as plt,h5py,numpy as np,random
 from collections import Counter
 class Data():
     def __init__(self,path,f,n,severe = True,split=0,normalize=False,shuffle=None):
@@ -36,8 +34,7 @@ class Data():
         if(shuffle is not None):self.shuffle_data(shuffle)
         if(split>0):self.split_data(split)
         if(normalize):self.normalize_data()
-            
-        
+        if(False):self.cutoff()
     def shuffle_data(self,seed=0):
         ## The shuffle parameter is None in init(). but if provided and int value it will be
         ## used as the random seed
@@ -67,6 +64,17 @@ class Data():
             self.val_wav_name = [self.val_wav_name[pr[x]] for x in range(len(self.val_wav_name))]
     def normalize_data(self):
         self.trainX = np.array([x/(max(abs(x)+10e-6)) for x in self.trainX.transpose()]).transpose()
+    def cutoff(self):
+        print("CUT          "*20)
+        self.trainX = np.array([self.cut(x)  for x in self.trainX.transpose()]).transpose()
+        if(self.valX is not None):
+            self.valX = np.array([self.cut(x)  for x in self.valX.transpose()]).transpose()
+    def cut(self,x):
+        mean = np.mean(x)
+        std = np.std(x)
+        x[x>(mean+std*2)] = (mean+std*2)
+        x[x<(mean-std*2)] = (mean-std*2)
+        return x
     def split_data(self,split):
         if(self.file[:3]=='com'):
             self.valX = self.data['valX'][:]
