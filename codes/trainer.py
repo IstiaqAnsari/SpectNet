@@ -23,7 +23,7 @@ from CustomTensorBoard import TensorBoard
 from keras.callbacks import LearningRateScheduler, ModelCheckpoint, CSVLogger
 from keras import backend as K
 from keras.utils import plot_model
-
+import pickle
 
 
 # from Heartnet import heartnet, getAttentionModel
@@ -86,7 +86,8 @@ if __name__ == '__main__':
         parser.add_argument("--self",type=bool, help = "If true model train and tests on same data with split")
         parser.add_argument("--balanced",type=bool, help = "If true model trains with BalancedAudioDataGenerator")
         parser.add_argument("--segment", type=int, help = "0 = old dataset, 1 = 2500 samples, 2 = repeated beats")
-        parser.add_argument("--shuffle", type=int, help = "0 = old dataset, 1 = 2500 samples, 2 = repeated beats")
+        parser.add_argument("--shuffle", type=int, help = "random seed for splitting data")
+        parser.add_argument("--equ", type=bool, help = "0 = old dataset, 1 = 2500 samples, 2 = repeated beats")
 
         args = parser.parse_args()
         if args.tune:
@@ -124,7 +125,7 @@ if __name__ == '__main__':
             print("Random seed specified as %d" % (args.seed))
             random_seed = args.seed
         else:
-            random_seed = 2
+            random_seed = 1
 
         if args.loadmodel:  # If a previously trained model is loaded for retraining
             load_path = args.loadmodel  #### path to model to be loaded
@@ -183,9 +184,11 @@ if __name__ == '__main__':
 
         ###################  NETWORK #############################
 
-        network = 'SmallNet'
+        network = 'LSTMSmallNet'
         if(network == 'heartnet'):
             from Heartnet import heartnet, getAttentionModel
+        elif(network == 'LSTMSmallNet'):
+            from LSTMSmallNet import heartnet, getAttentionModel
         elif(network =='SmallNet'):
             from SmallNet import heartnet, getAttentionModel
         elif(network=='HeartResNet'):
@@ -226,16 +229,25 @@ if __name__ == '__main__':
             fold_dir = directory[0]
             print("Working with previous zero padded data")
 
-        if(test_split>0):
-            if(args.balanced is not None):
-                log_name = foldname +' Tuned '+seg[args.segment]+' '+'unbalanced '+str(int(test_split*100))+' '+ str(batch_size)+' '+str(datetime.now())
-            else:
-                log_name = foldname +' Tuned '+seg[args.segment]+' '+str(int(test_split*100))+' '+ str(batch_size)+' '+str(datetime.now())
+        ##################### LOG NAME ###########################
+        if(args.balanced is not None):
+            balancedOrNot = 'unbalanced '
         else:
-            if(args.balanced is not None):
-                log_name = foldname + ' ' +seg[args.segment]+' '+ str(batch_size)+' '+ str(datetime.now())
-            else:
-                log_name = foldname + ' ' +seg[args.segment]+' '+ str(batch_size)+' '+ str(datetime.now())
+            balancedOrNot = ''
+        if(args.shuffle is not None):
+            shuffledOrNot = ''+str(args.shuffle)+' '
+        else:
+            shuffledOrNot = ''
+        if(test_split>0):
+            test_splitOrNot = ' Tuned '
+        else:
+            test_splitOrNot = ' '
+
+        log_name = foldname +test_splitOrNot+seg[args.segment if args.segment is not None else 0]+' '+balancedOrNot+shuffledOrNot+str(int(test_split*100))+' '+ str(batch_size)+' '+str(datetime.now())
+                    
+
+
+
         model_dir = '../../Adversarial Heart Sound Results/models/'+network+'/'
         log_dir = '../../Adversarial Heart Sound Results/logs/'+network+'/'
 
@@ -271,18 +283,60 @@ if __name__ == '__main__':
         bn_momentum = 0.99
         eps = 1.1e-5
         bias = False
-        l2_reg = 0.04864911065093751
-        l2_reg_dense = 0.
+        l2_reg = 0.0014864911065093751
+        l2_reg_dense = 0.001
         kernel_size = 5
         maxnorm = 10000.
         dropout_rate = 0.5
-        dropout_rate_dense = 0.
+        dropout_rate_dense = 0.1
         padding = 'valid'
         activation_function = 'relu'
         subsam = 2
         FIR_train= True
         trainable = True
         decision = 'majority'  # Decision algorithm for inference over total recording ('majority','confidence','match')
+
+        if not os.path.exists(log_dir + log_name):
+            if not evaluate:
+                os.makedirs(log_dir + log_name)
+        paramspath = log_dir+log_name+'/params.pickle'
+
+        keys = ['bn_momentum',
+                 'l2_reg',
+                 'l2_reg_dense',
+                 'kernel_size',
+                 'maxnorm',
+                 'dropout_rate',
+                 'dropout_rate_dense',
+                 'padding',
+                 'activation_function',
+                 'subsam',
+                 'FIR_train',
+                 'trainable',
+                 'optim',
+                 'equ']
+        params=[bn_momentum,
+                l2_reg,
+                l2_reg_dense,
+                kernel_size,
+                maxnorm,
+                dropout_rate,
+                dropout_rate_dense,
+                padding,
+                activation_function,
+                subsam,
+                FIR_train,
+                trainable,
+                optim,
+                True]
+        param_dict = {k:p for (k,p) in zip(keys,params)}
+        try:
+            with open(paramspath, "wb") as output_file:
+                pickle.dump(param_dict, output_file)
+        except:
+            paramspath = model_dir+'/params.pickle'
+            with open(paramspath, "wb") as output_file:
+                pickle.dump(param_dict, output_file)
 
         # lr =  0.0012843784 ## After bayesian optimization
 
