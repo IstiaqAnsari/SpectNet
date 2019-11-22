@@ -1,5 +1,51 @@
 before : Unsupervised , test data is totally unseen. 
 
-oct 30 : NOW RUNNING SEMI SUPERVISED. MEANING TEST DATA IS SHOWN BUT WITHOUT LABELS
+oct 30 : DANN NOW RUNNING SEMI SUPERVISED. MEANING TEST DATA IS SHOWN BUT WITHOUT LABELS
 
-nov 6  : Data is normalized in data holder. previsouly wasn't
+nov 6  : Data can be normalized in data holder. previsouly wasn't.
+
+nov 18 : random seed for model init 2 --> 1
+
+params: 
+	Data normalization
+	Data used (2500 samples/repeated beats/zeropadded)
+	Data randomsplit seed
+
+	Generator used Balanced or Unbalanced
+
+	Batch size
+	Learning rate
+	Regularizer
+	Dropout
+
+	Model (hearnet/heartsegnet/small res net)
+
+
+
+
+
+
+
+
+
+
+
+
+
+	num_filt = (8, 4)
+    num_dense = 20
+
+    bn_momentum = 0.99
+    eps = 1.1e-5
+    bias = False
+    l2_reg = 0.04864911065093751
+    l2_reg_dense = 0.
+    kernel_size = 5
+    maxnorm = 10000.
+    dropout_rate = 0.5
+    dropout_rate_dense = 0.
+    padding = 'valid'
+    activation_function = 'relu'
+    subsam = 2
+    FIR_train= True
+    trainable = True
