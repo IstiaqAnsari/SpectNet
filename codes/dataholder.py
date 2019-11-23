@@ -10,7 +10,13 @@ class Data():
         self.data = h5py.File(path+f, 'r')
         self.file = f
         self.dom = n
-        self.trainX = np.array(self.data['trainX'][:]).astype('float32')
+        self.segments = ['s1','systole','s2','diastole']
+        print(path)
+        self.seg = ('4_segments' in path)
+        if(self.seg):
+            self.trainX = {k:np.array(self.data[k][:]).astype('float32') for k in self.segments}
+        else:
+            self.trainX = np.array(self.data['trainX'][:]).astype('float32')
         self.trainY = self.data['trainY'][:][0].astype('int8')
         self.train_parts = self.data['train_parts'][0].astype('int32')
         self.wav_name = [''.join([chr(c[0]) for c in self.data[stp]]) for stp in self.data['wav_name'][0]]
@@ -20,7 +26,6 @@ class Data():
         self.valdomY = None
         self.val_parts = None
         self.domainY = [n]*self.trainY.shape[0]
-        
         ##calculate the normal and abnormal beats count
         self.normal = Counter(self.trainY)[0]
         self.abnormal = Counter(self.trainY)[1]
@@ -45,7 +50,11 @@ class Data():
             random.Random(seed).shuffle(pr)
             s = 0
             for i,x in enumerate(pr):
-                xx[:,s:s+self.train_parts[x]] = self.trainX[:,sum(self.train_parts[:x]):sum(self.train_parts[:x])+self.train_parts[x]]
+                if(self.seg):
+                    for k in self.segments:
+                        xx[k][:,s:s+self.train_parts[x]] = self.trainX[k][:,sum(self.train_parts[:x]):sum(self.train_parts[:x])+self.train_parts[x]]
+                else:
+                    xx[:,s:s+self.train_parts[x]] = self.trainX[:,sum(self.train_parts[:x]):sum(self.train_parts[:x])+self.train_parts[x]]
                 yy[s:s+self.train_parts[x]] = self.trainY[sum(self.train_parts[:x]):sum(self.train_parts[:x])+self.train_parts[x]]
                 s = s+self.train_parts[x]
             self.train_parts = self.train_parts[pr]
@@ -57,7 +66,10 @@ class Data():
             random.Random(seed).shuffle(pr)
             s = 0
             for i,x in enumerate(pr):
-                xx[:,s:s+self.train_parts[x]] = self.valX[:,sum(self.train_parts[:x]):sum(self.train_parts[:x])+self.train_parts[x]]
+                if(self.seg):
+                    xx[k][:,s:s+self.train_parts[x]] = self.valX[k][:,sum(self.train_parts[:x]):sum(self.train_parts[:x])+self.train_parts[x]]
+                else:
+                    xx[:,s:s+self.train_parts[x]] = self.valX[:,sum(self.train_parts[:x]):sum(self.train_parts[:x])+self.train_parts[x]]
                 yy[s:s+self.train_parts[x]] = self.valY[sum(self.train_parts[:x]):sum(self.train_parts[:x])+self.train_parts[x]]
                 s = s+self.train_parts[x]
             self.train_parts = self.val_parts[pr]
@@ -65,10 +77,7 @@ class Data():
     def normalize_data(self):
         self.trainX = np.array([x/(max(abs(x)+10e-6)) for x in self.trainX.transpose()]).transpose()
     def cutoff(self):
-        print("CUT          "*20)
         self.trainX = np.array([self.cut(x)  for x in self.trainX.transpose()]).transpose()
-        if(self.valX is not None):
-            self.valX = np.array([self.cut(x)  for x in self.valX.transpose()]).transpose()
     def cut(self,x):
         mean = np.mean(x)
         std = np.std(x)
@@ -96,20 +105,31 @@ class Data():
             if(taken<split*self.total):
                 taken = taken + x
                 if(self.valX is None):
-                    self.valX = self.trainX[:,left:x+left]
+                    if(self.seg):
+                        self.valX = {k:self.trainX[k][:,left:x+left] for k in self.segments}
+                    else:
+                        self.valX = self.trainX[:,left:x+left]
                     self.valY = self.trainY[left:x+left]
                 else:
-                    
-                    self.valX = np.concatenate((self.valX,self.trainX[:,left:x+left]),axis=1)
+                    if(self.seg):
+                        self.valX = {k:np.concatenate((self.valX[k],self.trainX[k][:,left:x+left]),axis=1) for k in self.segments}
+                    else:
+                        self.valX = np.concatenate((self.valX,self.trainX[:,left:x+left]),axis=1)
                     self.valY = np.concatenate((self.valY,self.trainY[left:x+left]),axis=0)
                 self.val_parts.append(x)
                 self.val_wav_name.append(self.wav_name[j])
             else:
                 if(tmpX is None):
-                    tmpX = self.trainX[:,left:x+left]
+                    if(self.seg):
+                        tmpX = {k:self.trainX[k][:,left:x+left] for k in self.segments}
+                    else:
+                        tmpX = self.trainX[:,left:x+left]
                     tmpY = self.trainY[left:x+left]
                 else:
-                    tmpX = np.concatenate((tmpX,self.trainX[:,left:x+left]),axis=1)
+                    if(self.seg):
+                        tmpX = {k:np.concatenate((tmpX[k],self.trainX[k][:,left:x+left]),axis=1) for k in self.segments}
+                    else:
+                        tmpX = np.concatenate((tmpX,self.trainX[:,left:x+left]),axis=1)
                     tmpY = np.concatenate((tmpY,self.trainY[left:x+left]),axis=0)
                 parts.append(x)
                 wav_name.append(self.wav_name[j])
