@@ -78,7 +78,7 @@ def res_block(input_tensor,num_filt,kernel_size,stride,padding,random_seed,bias,
 def heartnet(load_path,activation_function='relu', bn_momentum=0.99, bias=False, dropout_rate=0.5, dropout_rate_dense=0.0,
              eps=1.1e-5, kernel_size=5, l2_reg=0.0, l2_reg_dense=0.0,lr=0.0012843784, lr_decay=0.0001132885, maxnorm=10000.,
              padding='valid', random_seed=1, subsam=2, num_filt=(8, 4), num_dense=20,FIR_train=False,trainable=True,type=1,
-             num_class=2, num_class_domain=1,hp_lambda=0,batch_size=1024,optim='SGD'):
+             num_class=2, num_class_domain=1,hp_lambda=0,batch_size=1024,optim='SGD',segments='0101'):
     
     #num_dense = 20 default 
     input = Input(shape=(2500, 1))
