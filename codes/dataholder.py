@@ -18,6 +18,13 @@ class Data():
         else:
             self.trainX = np.array(self.data['trainX'][:]).astype('float32')
         self.trainY = self.data['trainY'][:][0].astype('int8')
+        #self.trainY = self.data['trainY'][:][1].astype('int8')
+        ##beat quality and wav quality
+        self.beat_q = self.data['trainY'][:][1].astype('int8')
+        try:
+            self.wav_q = self.data['sig_quality'][:][0].astype('int8')
+        except:
+            print("sig quality nai")
         self.train_parts = self.data['train_parts'][0].astype('int32')
         self.wav_name = [''.join([chr(c[0]) for c in self.data[stp]]) for stp in self.data['wav_name'][0]]
         self.valX = None
@@ -25,21 +32,34 @@ class Data():
         self.val_wav_name = None
         self.valdomY = None
         self.val_parts = None
+        
+        if(False):self.eliminateBadData()
+        
         self.domainY = [n]*self.trainY.shape[0]
         ##calculate the normal and abnormal beats count
-        self.normal = Counter(self.trainY)[0]
         self.abnormal = Counter(self.trainY)[1]
-        self.total = self.normal+self.abnormal
+        self.total = len(self.trainY)-self.abnormal
+        self.normal = self.total - self.abnormal
         self.normfiles, self.abnormfiles = self.parts() 
         
         if(f[:3]=='com'):self.processCompare(severe) ### select severe files only
         else:
-            self.trainY[self.trainY<0] = 0   
+            self.trainY[self.trainY<0] = 0
         if('fold_e' in f):self.processE()
         if(shuffle is not None):self.shuffle_data(shuffle)
         if(split>0):self.split_data(split)
-        if(normalize):self.normalize_data()
-        if(False):self.cutoff()
+        #if(normalize):self.normalize_data()
+    def eliminateBadData(self):
+        print("not implemented")
+        # if(self.seg):
+        #     for k in self.segments:
+        #         self.trainX[k] = self.trainX[k][:,(self.beat_q==1)]
+        # else:
+        #     self.trainX = self.trainX[:,(self.beat_q==1)]
+        # self.trainY = self.trainY[(self.beat_q==1)]
+        # self.train_parts = self.train_parts[(self.wav_q==1)]
+        # self.wav_name = [x for (x,q) in zip(self.wav_name,self.wav_q) if(q==1)]
+        
     def shuffle_data(self,seed=0):
         ## The shuffle parameter is None in init(). but if provided and int value it will be
         ## used as the random seed
