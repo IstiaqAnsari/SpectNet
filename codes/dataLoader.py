@@ -4,11 +4,13 @@ from collections import Counter
 from  dataholder import Data
 
 class DataMerge():
-    def __init__(self,split = 0):
+    def __init__(self,split = 0,path=''):
         self.split = split
         self.x_train = self.y_train = self.y_domain = self.train_parts = None
         self.x_val = self.y_val = self.y_valdom = self.val_parts = None
         self.val_wav_name = None
+        self.seg = ('4_segments' in path)
+
         #self.train_normal, self.train_abnormal, self.val_normal, self.val_abnormal = 0
         #self.train_total , self.val_total = 0
     def merge(self,data,train_test):
@@ -87,7 +89,7 @@ def getData(fold_dir, train_folds, test_folds, split = 0, shuffle = None):
     except:
         raise FileNotFoundError("The json file in Data folder of the repository, that maps domain character to filename is not here")
 
-    allData = DataMerge(split)
+    allData = DataMerge(split,fold_dir)
     for c in test_folds:
         allData.merge(Data(fold_dir,foldname[c],c,severe = False,split=split,shuffle=shuffle),True)
     for c in train_folds:
