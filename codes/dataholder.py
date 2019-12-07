@@ -13,7 +13,7 @@ class Data():
         self.file = f
         self.dom = n
         self.segments = ['s1','systole','s2','diastole']
-        print("path = ",path)
+        # print("path = ",path)
         self.seg = ('4_segments' in path)
         if(self.seg):
             self.trainX = {k:np.array(self.data[k][:]).astype('float32') for k in self.segments}
@@ -205,7 +205,7 @@ class Data():
         self.val_wav_name = [''.join([chr(c[0]) for c in self.data[stp]]) for stp in self.data['val_wav_name'][0]]
         
         if(severe):
-            print("fixed implementation, normal = 0, mild = 1, sever = 2. mild is being selected.")
+            print("Interspeech - fixed implementation, normal = 0, mild = 1, sever = 2. mild is being selected.")
             print("Segmentated data handling not implemented yet")
             self.sevX = None
             self.sevY = self.trainY[self.trainY%2==0]
@@ -228,6 +228,7 @@ class Data():
             self.wav_name = self.sev_wav_name
             self.train_parts = np.asarray(self.sev_parts)
             self.domainY = [self.dom]*self.trainY.shape[0]
+            self.trainY[self.trainY>0] = 1
             #self.parts()
         else:
             self.trainY[self.trainY>0] = 1
