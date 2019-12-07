@@ -163,7 +163,7 @@ def heartnet(load_path,activation_function='relu', bn_momentum=0.99, bias=False,
         domain_loss_function = 'categorical_crossentropy'
     else:
         domain_loss_function = 'binary_crossentropy'
-    model.compile(optimizer=opt, loss={'class':'categorical_crossentropy','domain':domain_loss_function}, loss_weights=[1,0], metrics=['accuracy'])
+    model.compile(optimizer=opt, loss={'class':'categorical_crossentropy','domain':domain_loss_function}, loss_weights=[1,1], metrics=['accuracy'])
     #model.compile(optimizer=opt, loss={'class':'categorical_crossentropy','domain':'categorical_crossentropy'}, metrics=['accuracy'])
     return model
 
