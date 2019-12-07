@@ -88,6 +88,8 @@ if __name__ == '__main__':
         parser.add_argument("--segment", type=int, help = "0 = old dataset, 1 = 2500 samples, 2 = repeated beats")
         parser.add_argument("--shuffle", type=int, help = "random seed for splitting data")
         parser.add_argument("--equ", type=bool, help = "0 = old dataset, 1 = 2500 samples, 2 = repeated beats")
+        parser.add_argument("--channels",help="Select among s1, systole, s2, diastole")
+        parser.add_argument("--network",help="Choose the network to use")
 
         args = parser.parse_args()
         if args.tune:
@@ -125,7 +127,7 @@ if __name__ == '__main__':
             print("Random seed specified as %d" % (args.seed))
             random_seed = args.seed
         else:
-            random_seed = 1
+            random_seed = 2
 
         if args.loadmodel:  # If a previously trained model is loaded for retraining
             load_path = args.loadmodel  #### path to model to be loaded
@@ -181,10 +183,17 @@ if __name__ == '__main__':
             hp_lambda = np.float32(args.dann)
         else:
             hp_lambda = np.float32(0)
+        if args.channels:
+            channels = args.channels
+        else:
+            channels = '1111'
 
         ###################  NETWORK #############################
+        if(args.network):
+            network = args.network
+        else:    
+            network = 'SmallNet'
 
-        network = 'LSTMSmallNet'
         if(network == 'heartnet'):
             from Heartnet import heartnet, getAttentionModel
         elif(network == 'LSTMSmallNet'):
@@ -195,6 +204,8 @@ if __name__ == '__main__':
             from HeartResNet import heartnet, getAttentionModel
         elif(network=='HeartSegNet'):
             from HeartSegNet import heartnet, getAttentionModel
+        elif(network=='DenseNet'):
+            from DenseNet import heartnet, getAttentionModel
         else:
             print("Please define network")
             exit(0)
@@ -215,10 +226,11 @@ if __name__ == '__main__':
         print("Attention" *10)
         print("Make sure to select the right fold to use")
 
-        seg = {0:'zeropad',1:'2500sam',2:'repeated'}
+        seg = {0:'zeropad',1:'2500sam',2:'repeated',3:'channels'}
         directory = {0:'../../feature/potes_1DCNN/balancedCV/folds/all_folds_wav_name/', 
                      1:'../../feature/potes_1DCNN/balancedCV/folds/all_folds_wav_name/', 
-                     2:'../../feature/potes_1DCNN/balancedCV/folds/individual_fold_beats_repeated/'}
+                     2:'../../feature/potes_1DCNN/balancedCV/folds/individual_fold_beats_repeated/',
+                     3:'../../feature/potes_1DCNN/balancedCV/folds/individual_fold_4_segments/'}
         #fold_dir = '../../feature/potes_1DCNN/balancedCV/folds/folds_phys_compare_pascal/'
         #fold_dir = '../../feature/potes_1DCNN/balancedCV/folds/all_folds_wav_name/'
         #fold_dir = '../../feature/potes_1DCNN/balancedCV/folds/individual_fold_2500_samples/'
@@ -283,7 +295,7 @@ if __name__ == '__main__':
         bn_momentum = 0.99
         eps = 1.1e-5
         bias = False
-        l2_reg = 0.0014864911065093751
+        l2_reg = 0.14864911065093751
         l2_reg_dense = 0.001
         kernel_size = 5
         maxnorm = 10000.
@@ -314,7 +326,8 @@ if __name__ == '__main__':
                  'FIR_train',
                  'trainable',
                  'optim',
-                 'equ']
+                 'equ',
+                 'channels']
         params=[bn_momentum,
                 l2_reg,
                 l2_reg_dense,
@@ -328,9 +341,14 @@ if __name__ == '__main__':
                 FIR_train,
                 trainable,
                 optim,
-                True]
+                True,
+                channels]
         param_dict = {k:p for (k,p) in zip(keys,params)}
         try:
+            with open(paramspath, "wb") as output_file:
+                pickle.dump(param_dict, output_file)
+
+            paramspath = model_dir+'/params.pickle'
             with open(paramspath, "wb") as output_file:
                 pickle.dump(param_dict, output_file)
         except:
@@ -360,7 +378,12 @@ if __name__ == '__main__':
         num_class_domain = len(domains)
         num_class = 2
         if(args.self):
-            x_train, y_train, y_domain, train_parts,x_val, y_val, val_domain, val_parts, val_wav_files = dataLoader.getData(fold_dir,'',test_domains,0.7,shuffle=args.shuffle)
+            print("Self training activated")
+            x_train, y_train, y_domain, train_parts, x_val, y_val, val_domain, val_parts,val_wav_files = dataLoader.getData(fold_dir,'',test_domains,0.9,shuffle=args.shuffle)
+            print("Self training wtf")
+
+            print(x_train.shape, x_val.shape)
+            print("Self training shapes koi? ")
         else:
             x_train, y_train, y_domain, train_parts,x_val, y_val, val_domain, val_parts, val_wav_files = dataLoader.getData(fold_dir,train_domains,test_domains,test_split,shuffle = args.shuffle)
 
@@ -376,11 +399,11 @@ if __name__ == '__main__':
         #Create meta labels and domain labels
         domains = train_domains
         if(test_split>0):
-            #domains = "".join(set(domains).union(set(test_domains)))
-            domains = domains + test_domains
+            domains = "".join(set(domains).union(set(test_domains)))
+            #domains = domains + test_domains
         elif(args.dann):
-            #domains = "".join(set(domains).union(set(test_domains)))
-            domains = domains + test_domains
+            domains = "".join(set(domains).union(set(test_domains)))
+            #domains = domains + test_domains
 
         if(args.self):
             print("self training")
@@ -388,10 +411,13 @@ if __name__ == '__main__':
             num_class_domain = len(set(domains))
 
         domainClass = [(cls,dfc) for cls in range(2) for dfc in domains]
+
         if(args.dann):
             meta_labels = [domainClass.index((cl,df)) for (cl,df) in zip(np.concatenate((y_train,y_val)),(y_domain+val_domain))]
         else:
             meta_labels = [domainClass.index((cl,df)) for (cl,df) in zip(y_train,y_domain)]
+
+        domains = "".join(set(domains).union(set(test_domains)))
 
         y_domain = np.array([list(domains).index(lab) for lab in y_domain])
 
@@ -415,7 +441,10 @@ if __name__ == '__main__':
         print("Train files ", y_train.shape, "  Domain ", y_domain.shape)
         print("Test files ", y_val.shape, "  Domain ", val_domain.shape)
 
-
+        ### Batch Size limmiter 
+        if(batch_size > max(y_train.shape)):
+            print("Batch size if given greater than train files size. limiting batch size")
+            batch_size = max(y_train.shape)
         
         ############## Create a model ############
 
@@ -432,12 +461,14 @@ if __name__ == '__main__':
             print("Testing")
             print("Testing")
 
-            load_path = '../../Adversarial Heart Sound Results/models/dann/bcdefghi_a 2019-11-02 17:37:44.337530/weights.0012-0.6994.hdf5'
+            load_path = '../../Adversarial Heart Sound Results/models/DenseNet/self_train/a channels 1 0 800 2019-11-25 16:05:13.554565/weights.0001-0.2812.hdf5'
+
+
 
             model = heartnet(load_path,activation_function, bn_momentum, bias, dropout_rate, dropout_rate_dense,
                              eps, kernel_size, l2_reg, l2_reg_dense, lr, lr_decay, maxnorm,
                              padding, random_seed, subsam, num_filt, num_dense, FIR_train, trainable, type,
-                             num_class=num_class,num_class_domain=num_class_domain,hp_lambda=hp_lambda,batch_size=batch_size,optim=optim)
+                             num_class=num_class,num_class_domain=num_class_domain,hp_lambda=hp_lambda,batch_size=batch_size,optim=optim,segments = '0101')
             y_pred,y_pred_domain = model.predict(x_val, verbose=verbose)
             Evaluator.eval(y_val,y_pred,y_pred_domain,val_parts,val_files,val_wav_files,foldname)
         else:
