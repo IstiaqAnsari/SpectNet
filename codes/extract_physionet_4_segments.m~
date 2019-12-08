@@ -11,7 +11,7 @@ Ndis=1700;%max of dis to next s1 = 1680
 % wrong = 0;
 % right = 0;
 %%
-for folder_idx=2:2
+for folder_idx=0:0
     disp("folder idx");
     disp(folder_idx);
     if folder_idx==10
@@ -74,13 +74,8 @@ exclude = importlist(exclude_text);
 ftype = repmat('.wav',[length(exclude),1]); 
 exclude = strcat(exclude,ftype); % list of files to be excluded from training-e
 %%
-check = 1  ; 
-label_pointer = check;
-for file_idx=check:num_files
+for file_idx=11:num_files
     fprintf('File number %i\n', file_idx)
-    if(labels(file_idx,1)==1)
-        continue;
-    end
 %% Importing signals
     if folder_idx==4    % if dataset is training-e
         if sum(cell2mat(strfind(exclude,d(file_idx).name))) % if file is found in exclude list
@@ -105,7 +100,18 @@ for file_idx=check:num_files
     % remove spikes
     PCG_resampled = schmidt_spike_removal(PCG_resampled,springer_options.audio_Fs);
     
+    fprintf('label pointer %i\nLabels\n',label_pointer);
+    fprintf('label pointer %i\nLabels\n',label_pointer);
+    disp(labels(label_pointer,:));
+    fprintf('%s\n',d(file_idx).name);
+    label_pointer = label_pointer+1;
     
+    fprintf('Playing\n')
+    soundsc(PCG_resampled,1000);
+    
+    pause(ceil(length(PCG_resampled)/1000));
+    fprintf('Resuming\n\n\n\n')
+    continue;
 %% Run springer's segmentation
 
     assigned_states = runSpringerSegmentationAlgorithm(PCG_resampled,... 
@@ -207,11 +213,11 @@ end
     wav_name = convertStringsToChars(file_name);
     sig_quality = labels(:,2);
 %% Save Data
-    sname=[savedir 'fold_' 'a'+folder_idx '.mat',];
+    sname=[savedir 'fold_' 'aa'+folder_idx '.mat',];
     disp(['Saving ' sname])
     trainY = Y;
     %save(sname, 'X', 'Y', 'states', 'file_name');
-    save(sname, 's1','s2','systole','diastole', 'trainY', 'train_files','train_parts','sig_quality','wav_name','-v7.3');
+    %save(sname, 's1','s2','systole','diastole', 'trainY', 'train_files','train_parts','sig_quality','wav_name','-v7.3');
 end
 
 

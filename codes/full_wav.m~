@@ -11,7 +11,7 @@ Ndis=1700;%max of dis to next s1 = 1680
 % wrong = 0;
 % right = 0;
 %%
-for folder_idx=2:2
+for folder_idx=0:0
     disp("folder idx");
     disp(folder_idx);
     if folder_idx==10
@@ -105,7 +105,17 @@ for file_idx=check:num_files
     % remove spikes
     PCG_resampled = schmidt_spike_removal(PCG_resampled,springer_options.audio_Fs);
     
+    fprintf('label pointer %i\nLabels\n',file_idx);
+    disp(labels(file_idx,:));
+    fprintf('%s\n',d(file_idx).name);
+    label_pointer = label_pointer+1;
     
+    fprintf('Playing %i\n',ceil(length(PCG_resampled)/1000))
+    soundsc(PCG_resampled,1000);
+    
+    pause(ceil(length(PCG_resampled)/1000));
+    fprintf('Resuming\n\n\n\n')
+    continue;
 %% Run springer's segmentation
 
     assigned_states = runSpringerSegmentationAlgorithm(PCG_resampled,... 
@@ -143,53 +153,7 @@ for file_idx=check:num_files
 %     [s1 sis s2 dis s1m sism s2m dism]
     
 %% Dividing signals into filter banks
-    clear PCG
-    PCG = PCG_resampled;
 
-    nfb = 4;
-    ncc = size(idx_states,1);
-    train_parts = [train_parts;ncc];
-    x = nan(ncc,Ns1+Nsis+Ns2+Ndis);
-    s = nan(ncc,Ns1);
-    sis = nan(ncc,Nsis);
-    ss = nan(ncc,Ns2);
-    dis = nan(ncc,Ndis);
-    take_last_beat = 0;
-    
-    for row=1:ncc
-        for fb=1:nfb
-            take_last_beat = 0;
-            if row == ncc % for the last complete cardiac cycle
-                if(last_idx>idx_states(row,4))
-                    take_last_beat = 1;
-                    ts1 = PCG(idx_states(row,1):idx_states(row,2)-1);
-                    tsis = PCG(idx_states(row,2):idx_states(row,3)-1);
-                    ts2 = PCG(idx_states(row,3):idx_states(row,4)-1);
-                    tdis = PCG(idx_states(row,4):last_idx-1);
-%                     tmp = PCG(idx_states(row,1):last_idx-1);
-                end
-            else
-                ts1 = PCG(idx_states(row,1):idx_states(row,2)-1);
-                tsis = PCG(idx_states(row,2):idx_states(row,3)-1);
-                ts2 = PCG(idx_states(row,3):idx_states(row,4)-1);
-                tdis = PCG(idx_states(row,4):idx_states(row+1,1)-1);
-%                 tmp = PCG(idx_states(row,1):idx_states(row+1,1)-1);
-            end
-%             N = nsamp-length(tmp); % append zeros at the end of cardiac cycle
-            ns1 = Ns1-length(ts1);
-            nsis = Nsis-length(tsis);
-            ns2 = Ns2-length(ts2);
-            ndis = Ndis-length(tdis);
-%             x(row,:) = [tmp; zeros(N,1)];
-            s(row,:) = [ts1; zeros(ns1,1)];
-            sis(row,:) = [tsis; zeros(nsis,1)];
-            ss(row,:) = [ts2; zeros(ns2,1)];
-            dis(row,:) = [tdis; zeros(ndis,1)];
-            x(row,:) = [s(row,:)';sis(row,:)';ss(row,:)';dis(row,:)']';
-            
-        end
-%         file_name=[file_name;string(d(file_idx).name)]; % matrix containing the filename
-                                                % of each cardiac cycle
         Y=[Y;labels(label_pointer,:)];               % Class labels for each cardiac cycle
     end
     file_name=[file_name;string(d(file_idx).name)]; % matrix containing the filename
@@ -207,11 +171,11 @@ end
     wav_name = convertStringsToChars(file_name);
     sig_quality = labels(:,2);
 %% Save Data
-    sname=[savedir 'fold_' 'a'+folder_idx '.mat',];
+    sname=[savedir 'fold_' 'aa'+folder_idx '.mat',];
     disp(['Saving ' sname])
     trainY = Y;
     %save(sname, 'X', 'Y', 'states', 'file_name');
-    save(sname, 's1','s2','systole','diastole', 'trainY', 'train_files','train_parts','sig_quality','wav_name','-v7.3');
+    %save(sname, 's1','s2','systole','diastole', 'trainY', 'train_files','train_parts','sig_quality','wav_name','-v7.3');
 end
 
 
@@ -219,44 +183,3 @@ end
 
 
 
-%% function to extract state index
-function [idx_states,last_idx] = get_states(assigned_states)
-    indx = find(abs(diff(assigned_states))>0); % find the locations with changed states
-
-    if assigned_states(1)>0   % for some recordings, there are state zeros at the beginning of assigned_states
-        switch assigned_states(1)
-            case 4
-                K=1;
-            case 3
-                K=2;
-            case 2
-                K=3;
-            case 1
-                K=4;
-        end
-    else
-        switch assigned_states(indx(1)+1)
-            case 4
-                K=1;
-            case 3
-                K=2;
-            case 2
-                K=3;
-            case 1
-                K=0;
-        end
-        K=K+1;
-    end
-
-    indx2                = indx(K:end); % K controls the starting cycle
-                                        % of the segment. Starting cycle
-                                        % is always kept 1 through the 
-                                        % switch cases (!)
-                                        
-    rem                  = mod(length(indx2),4);
-    last_idx             = length(indx2)-rem+1;
-    indx2(last_idx:end) = []; % clipping the partial segments in the end
-    idx_states           = reshape(indx2,4,length(indx2)/4)'; % idx_states 
-                            % reshaped into a no.segments X 4 sized matrix
-                            % containing state indices
-end
