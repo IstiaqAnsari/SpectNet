@@ -75,7 +75,13 @@ class Result():
                     break
         self.trainer = self.log_name.split('_')[0]
         self.tester = self.log_name.split('_')[1]
-        self.df = pd.read_csv(self.log_dir+log+'/training.csv')
+        if('logs' in log): # Means full path given
+            self.log_name = log.split('/')[-1].split(' ')[0]
+            if('dann' in log):
+                self.log_name = self.log_name + " dann"
+            self.df = pd.read_csv(log+'/training.csv')
+        else:
+            self.df = pd.read_csv(self.log_dir+log+'/training.csv')
         self.df.sort_values(by=['val_macc','val_F1'],ascending=False,inplace = True)
         self.df = dict(self.df.iloc[0][self.metrics])
 
