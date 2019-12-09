@@ -100,10 +100,11 @@ class ResultsComparison():
         self.data = [Result(l) for l in self.logs]
         if(self.logs_dann is not None):
             self.data = self.data+[Result(l,True) for l in self.logs_dann]
-    def show(self,width = 0.35,figsize=(8,5)):
+    def show(self,fig=None,ax=None,width = 0.35,figsize=(8,5),shownow=True):
         x = np.arange(len(self.metrics))
         print(x)
-        fig, ax = plt.subplots(figsize=figsize)
+        if(fig==None):
+            fig, ax = plt.subplots(figsize=figsize)
         plot_number = len(self.data)
         width = .8/plot_number
         idx = np.arange(-(plot_number-1)/2,(plot_number-1)/2+1,1)
@@ -121,7 +122,8 @@ class ResultsComparison():
         ax.set_xticklabels(self.metrics)
         ax.legend()
         fig.tight_layout()
-        plt.show()
+        if(shownow):
+            plt.show()
     def autolabel(self,rects,ax):
         for rect in rects:
             height = rect.get_height()
