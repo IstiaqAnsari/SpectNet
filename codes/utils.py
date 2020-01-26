@@ -103,10 +103,9 @@ class log_macc(Callback):
             F1 = 2 * (precision * sensitivity) / (precision + sensitivity + eps)
             Macc = (sensitivity + specificity) / 2
             logs['learning_rate'] = K.get_value(self.model.optimizer.lr)
-            try:
-                logs['lambda_rate'] = K.get_value(self.model.get_layer('grl').hp_lambda)
-            except:
-                pass
+
+            #logs['lambda_rate'] = K.get_value(self.model.get_layer('grl').hp_lambda)
+
             logs['val_sensitivity'] = np.array(sensitivity)
             logs['val_specificity'] = np.array(specificity)
             logs['val_precision'] = np.array(precision)
