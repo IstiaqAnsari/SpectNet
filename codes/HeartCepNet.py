@@ -1,8 +1,8 @@
 from __future__ import print_function, absolute_import, division
-
+from keras.initializers import Initializer
 from custom_layers import Conv1D_zerophase_linear, Conv1D_linearphase, Conv1D_zerophase,\
     DCT1D, Conv1D_gammatone, Conv1D_linearphaseType, Attention
-from keras.layers import Input, Conv1D, MaxPooling1D, Dense, Dropout, Flatten, Activation, AveragePooling1D, Add
+from keras.layers import Input, Conv1D, MaxPooling1D,MaxPooling2D, Dense, Dropout, Flatten, Activation, AveragePooling1D, Add,Reshape
 from keras import initializers
 from keras.layers.normalization import BatchNormalization
 from keras.layers.merge import Concatenate
@@ -28,7 +28,7 @@ import tensorflow as tf,keras
 from keras.layers.merge import Concatenate
 from keras.utils import conv_utils
 from keras.layers import Input, MaxPooling1D ,Conv1D,Activation,Dense, activations, initializers,Conv2D
-from keras.layers import Flatten, regularizers, constraints, Lambda,Dropout,Multiply
+from keras.layers import Flatten, regularizers, constraints,Dropout,Multiply
 from keras.layers.normalization import BatchNormalization
 from keras.optimizers import Adam, SGD
 from keras.models import Model
@@ -60,8 +60,26 @@ def mfcc_kernel_init(shape, dtype=K.floatx()):
     mat = K.eye(in_channels,dtype=dtype)
     mat_n = [mat for i in range(kernel_size)]
     return K.stack(mat_n)
-def freq_init(shape,dtype=K.floatx(),minf=0,maxf=500,filters=26):
-    return K.expand_dims(K.arange(minf,hz2mel(maxf)+1,(hz2mel(maxf))/(filters-1),dtype=dtype),axis=1)
+class Freq_Init(Initializer):
+    def __init__(self, minf=0., maxf=500):
+        self.minf = minf
+        self.maxf = maxf
+    def __call__(self, shape, dtype=K.floatx()):
+        (kernel_size,in_channels) = shape
+        start = self.hz2mel(self.minf)
+        end = self.hz2mel(self.maxf)
+        n = ( end-start)/(kernel_size-1)
+        mel =  K.expand_dims(K.arange(start,end+1,n,dtype=dtype),axis=1)
+        return self.mel2hz(mel)
+    def hz2mel(self,hz):
+        return 2595 * (K.log(1.0+(hz*1.0)/700.)/K.log(10.0))
+    def mel2hz(self,mel):
+        return 700*(10**(mel/2595.0)-1)
+    def get_config(self):
+        return {
+            'minf': self.minf,
+            'maxf': self.maxf
+        }
 def hz2mel(hz):
     return 2595 * np.log10(1+hz/700.)
 def mel2hz(mel):
@@ -69,9 +87,15 @@ def mel2hz(mel):
 def erb(f):
     return 24.7*(4.37*10**-3*f+1)
 def beta_init(shape, dtype=K.floatx()):
-    beta_weights = erb(freq_init((26,1),minf=0,maxf=500,filters=26))
+    (kernel_size,in_channels) = shape
+    beta_weights = tf.convert_to_tensor(np.ones((kernel_size,1))*100,dtype=K.floatx())
     return beta_weights
 
+
+def expand(x):
+    return K.expand_dims(x, axis=-1)
+def expand_output_shape(input_shape):
+    return tuple(list(input_shape)+[1])
 def zeropad_len(x):
     return x[:,:-1,:]
 def zeropad_len_output_shape(input_shape):
@@ -148,19 +172,110 @@ def branch(input_tensor,num_filt,kernel_size,random_seed,padding,bias,maxnorm,l2
     t = Dropout(rate=dropout_rate, seed=random_seed)(t)
     
     return t
+def zeropad_len_Ax1(x):
+    print(x.shape)
+    return x[:,:-1,:,:]
+def zeropad_len_Ax2(x):
+    return x[:,:,:-1,:]
+def zeropad_len_output_shape_Ax1(input_shape):
+    shape = list(input_shape)
+    assert len(shape) == 4
+    shape[1] -= 1
+    return tuple(shape)
+def zeropad_len_output_shape_Ax2(input_shape):
+    shape = list(input_shape)
+    assert len(shape) == 4
+    shape[2] -= 1
+    return tuple(shape)
+def zeropad2d(x):
+    y = K.zeros_like(x)
+    return K.concatenate([x, y], axis=3)
+def zeropad_output_shape2d(input_shape):
+    shape = list(input_shape)
+    assert len(shape) == 4
+    shape[-1] *= 2
+    return tuple(shape)
+def branch2d(input_tensor,num_filt,kernel_size,random_seed,padding,bias,maxnorm,l2_reg,
+           eps,bn_momentum,activation_function,dropout_rate,subsam,trainable):
+    
+    pad1,pad2 = padding
+    num_filt1, num_filt2 = num_filt
+    t = Conv2D(num_filt1, kernel_size=kernel_size,
+                kernel_initializer=initializers.he_normal(seed=random_seed),
+                padding=pad1,
+                use_bias=bias,
+                kernel_constraint=max_norm(maxnorm),
+                trainable=trainable,
+                kernel_regularizer=l2(l2_reg))(input_tensor)
+    t = BatchNormalization(epsilon=eps, momentum=bn_momentum, axis=-1)(t)
+    t = Activation(activation_function)(t)
+    t = Dropout(rate=dropout_rate, seed=random_seed)(t)
+    t = Conv2D(num_filt2, kernel_size=kernel_size,
+               kernel_initializer=initializers.he_normal(seed=random_seed),
+               padding=pad2,
+               use_bias=bias,
+               trainable=trainable,
+               kernel_constraint=max_norm(maxnorm),
+               kernel_regularizer=l2(l2_reg))(t)
+    t = BatchNormalization(epsilon=eps, momentum=bn_momentum, axis=-1)(t)
+    t = Activation(activation_function)(t)
+    t = Dropout(rate=dropout_rate, seed=random_seed)(t)
+    
+    return t
+def res_block2d(input_tensor,num_filt,kernel_size,stride,padding,random_seed,bias,maxnorm,l2_reg,
+           eps,bn_momentum,activation_function,dropout_rate,subsam,trainable,cat=True):
+
+    t = Conv2D(num_filt, kernel_size=kernel_size,
+                kernel_initializer=initializers.he_normal(seed=random_seed),
+                padding=padding,
+                strides=stride,
+                use_bias=bias,
+                kernel_constraint=max_norm(maxnorm),
+                trainable=trainable,
+                kernel_regularizer=l2(l2_reg))(input_tensor)
+    t = BatchNormalization(epsilon=eps, momentum=bn_momentum, axis=-1)(t)
+    t = Activation(activation_function)(t)
+    t = Dropout(rate=dropout_rate, seed=random_seed)(t)
+    t = Conv2D(num_filt, kernel_size=kernel_size,
+                kernel_initializer=initializers.he_normal(seed=random_seed),
+                padding=padding,
+                strides=1,
+                use_bias=bias,
+                kernel_constraint=max_norm(maxnorm),
+                trainable=trainable,
+                kernel_regularizer=l2(l2_reg))(t)
+    t = BatchNormalization(epsilon=eps, momentum=bn_momentum, axis=-1)(t)
+    t = Activation(activation_function)(t)
+    t = Dropout(rate=dropout_rate, seed=random_seed)(t)
+    
+    p = MaxPooling2D(pool_size=stride)(input_tensor)
+    if(stride>1):
+        if(cat):
+            p = Lambda(zeropad2d, output_shape=zeropad_output_shape2d)(p)
+#         print("T", t.shape, "P", p.shape)
+        if(t.shape[1]!=p.shape[1]):
+            t = Lambda(zeropad_len_Ax1, output_shape=zeropad_len_output_shape_Ax1)(t)
+        if(t.shape[2]!=p.shape[2]):
+            t = Lambda(zeropad_len_Ax2, output_shape=zeropad_len_output_shape_Ax2)(t)
+#         print("T", t.shape, "P", p.shape, "PORe")
+    t = Add()([t,p])
+    return t
 def heartnet(kernel_size=5,fs=1000,winlen=0.025,winstep=0.01,filters=26,random_seed=1,padding='valid',bias=False,
            lr=0.0012843784,lr_decay=0.0001132885,subsam=2,num_filt=(26,32),num_dense=20,trainable=True,batch_size=1024,
            l2_reg=0.0,l2_reg_dense=0.0,bn_momentum=0.99,dropout_rate=0.5,dropout_dense=0.0,eps = 1.1e-5,maxnorm=10000,
            activation_function='relu'):
     input = Input(shape=(2500, 1))
-    t = Conv1D_gammatone(kernel_size=81,strides=1,filters=filters,
+    t = Conv1D_gammatone(kernel_size=81, strides=1,filters=filters,
                          fsHz=fs,use_bias=False,padding='same',
-                         fc_initializer=freq_init,
+                         fc_initializer=Freq_Init(minf=50.0,maxf=fs/2),
                          amp_initializer=initializers.constant(10**4),
                         beta_initializer=beta_init,name="gamma"
                         )(input)
-    t = MFCC(rank = 1,filters=filters,kernel_size=int(winlen*fs),strides=int(winstep*fs),
+    t = BatchNormalization(epsilon=eps, momentum=bn_momentum, axis=-1)(t)
+    t = MFCC(rank = 1,filters=filters,kernel_size=int(winlen*fs),output_format='signal',strides=int(winstep*fs),
               kernel_initializer = mfcc_kernel_init, name="mfcc")(t)
+    t = BatchNormalization(epsilon=eps, momentum=bn_momentum, axis=-1)(t)
+    
     t = branch(t,num_filt,kernel_size,random_seed,padding,bias,maxnorm,l2_reg,
            eps,bn_momentum,activation_function,dropout_rate,subsam,trainable)
 
@@ -185,11 +300,76 @@ def heartnet(kernel_size=5,fs=1000,winlen=0.025,winstep=0.01,filters=26,random_s
     
     return model
 
+def heartnet2D(kernel_size=5,fs=1000,winlen=0.025,winstep=0.01,filters=26,random_seed=1,padding='valid',bias=False,
+           lr=0.0012843784,lr_decay=0.0001132885,subsam=2,num_filt=(16,32),num_dense=20,trainable=True,batch_size=1024,
+           l2_reg=0.0,l2_reg_dense=0.0,bn_momentum=0.99,dropout_rate=0.5,dropout_dense=0.0,eps = 1.1e-5,maxnorm=10000,
+           activation_function='relu'):
+    input = Input(shape=(2500, 1))
+    t = Conv1D_gammatone(kernel_size=81,strides=1,filters=filters,
+                         fsHz=fs,use_bias=False,padding='same',
+                         fc_initializer=Freq_Init(minf=50.0,maxf=fs/2),
+                         amp_initializer=initializers.constant(10**4),
+                        beta_initializer=beta_init,name="gamma"
+                        )(input)
+    t = BatchNormalization(epsilon=eps, momentum=bn_momentum, axis=-1)(t)
+    t = MFCC(rank = 1,filters=filters,kernel_size=int(winlen*fs),output_format='signal',strides=int(winstep*fs),
+              kernel_initializer = mfcc_kernel_init, name="mfcc")(t)
+    # t = Lambda(expand,output_shape=expand_output_shape)(t)
+    t = BatchNormalization(epsilon=eps, momentum=bn_momentum, axis=-1)(t)
+    t = Reshape(target_shape=(-1,filters,1))(t)
+
+    t = Conv2D(32, kernel_size=kernel_size,
+                kernel_initializer=initializers.he_normal(seed=random_seed),
+                padding='valid',
+                use_bias=bias,
+                kernel_constraint=max_norm(maxnorm),
+                trainable=trainable,
+                kernel_regularizer=l2(l2_reg))(t)
+    # t = BatchNormalization(epsilon=eps, momentum=bn_momentum, axis=-1)(t)
+    # t = Activation(activation_function)(t)
+    # t = Dropout(rate=dropout_rate, seed=random_seed)(t)
+
+    # t = branch2d(t,num_filt,kernel_size,random_seed,('valid','valid'),bias,maxnorm,l2_reg,
+    #        eps,bn_momentum,activation_function,dropout_rate,subsam,trainable)
+    # t = MaxPooling2D((2,1))(t)
+    # t = branch2d(t,(32,64),(kernel_size,3),random_seed,('valid','valid'),bias,maxnorm,l2_reg,
+    #        eps,bn_momentum,activation_function,dropout_rate,subsam,trainable)
+    # t = MaxPooling2D((2,1))(t)
+    # t = branch2d(t,(64,128),kernel_size,random_seed,('valid','valid'),bias,maxnorm,l2_reg,
+    #        eps,bn_momentum,activation_function,dropout_rate,subsam,trainable)
+    # t = MaxPooling2D((2,1))(t)
+    # t = branch2d(t,(128,256),kernel_size,random_seed,('same','same'),bias,maxnorm,l2_reg,
+    #        eps,bn_momentum,activation_function,dropout_rate,subsam,trainable)
+#     t = res_block2d(t,32,5,1,'valid',random_seed,bias,maxnorm,l2_reg,
+#            eps,bn_momentum,activation_function,dropout_rate,subsam,trainable)
+
+#     t = res_block2d(t,64,5,2,'same',random_seed,bias,maxnorm,l2_reg,
+#            eps,bn_momentum,activation_function,dropout_rate,subsam,trainable)
+    
+#     t = res_block2d(t,128,5,2,'same',random_seed,bias,maxnorm,l2_reg,
+#            eps,bn_momentum,activation_function,dropout_rate,subsam,trainable)
+#     t = MaxPooling2D((2,1))(t)
+    t = Flatten()(t)
+    t = Dense(20,
+                   activation=activation_function,
+                   kernel_initializer=initializers.he_normal(seed=random_seed),
+                   use_bias=bias,
+                   kernel_constraint=max_norm(maxnorm),
+                   kernel_regularizer=l2(l2_reg_dense),
+                   name = 'class_dense')(t)
+    t = Dense(2, activation='softmax', name="class")(t)
+    opt = Adam(lr=.001,decay=.001,epsilon=eps)
+    
+    model = Model(inputs=input, outputs=t)
+    model.compile(optimizer=opt, loss='categorical_crossentropy', metrics=['accuracy'])
+    
+    return model
 
 class MFCC(Layer): 
     def __init__(self, rank,
                  filters,
                  kernel_size,
+                 output_format='signal',
                  strides=1,
                  padding='valid',
                  data_format=None,
@@ -213,6 +393,7 @@ class MFCC(Layer):
         self.padding = conv_utils.normalize_padding(padding)
         self.data_format = K.normalize_data_format(data_format)
         self.kernel_initializer = kernel_initializer
+        self.output_format = output_format
         self.input_spec = InputSpec(ndim=self.rank + 2)
 
     def build(self, input_shape):
@@ -245,8 +426,8 @@ class MFCC(Layer):
             data_format=self.data_format)
         outputs = K.log(outputs)
 #         outputs = tf.signal.dct(outputs,type=2,axis=-1,norm='ortho')
-        
-        
+        if(self.output_format=='image'):
+            outputs = K.expand_dims(outputs,axis=-1)
         return outputs
 
     def compute_output_shape(self, input_shape):
@@ -260,8 +441,13 @@ class MFCC(Layer):
                     padding=self.padding,
                     stride=self.strides[i])
                 new_space.append(new_dim)
-            return (input_shape[0],) + tuple(new_space) + (self.filters,)
+            if(self.output_format=='image'):
+                return (input_shape[0],) + tuple(new_space) + (self.filters,) + (1,)
+            else:
+                return (input_shape[0],) + tuple(new_space) + (self.filters,)
+            
         if self.data_format == 'channels_first':
+            raise NotImplementedError("Output formate image/signal not handled")
             space = input_shape[2:]
             new_space = []
             for i in range(len(space)):
@@ -280,7 +466,8 @@ class MFCC(Layer):
             'kernel_size': self.kernel_size,
             'strides': self.strides,
             'padding': self.padding,
-            'data_format': self.data_format
+            'data_format': self.data_format,
+            'output_format':self.output_format
         }
-        base_config = super(MFCC, self).get_config()
+        base_config = super(_Conv, self).get_config()
         return dict(list(base_config.items()) + list(config.items()))
