@@ -53,13 +53,21 @@ from scipy.fftpack import dct
 from keras.backend.common import normalize_data_format
 from keras.layers.merge import Multiply
 
-def mfcc_kernel_init(shape, dtype=K.floatx()):
-    (kernel_size,in_channels,out_channels) = shape
-    if(in_channels!=out_channels):
-        raise ValueError("Input and Output Channels must be same. Got {0} input channels and {0} output channels".format(in_channels,out_channels))
-    mat = K.eye(in_channels,dtype=dtype)
-    mat_n = [mat for i in range(kernel_size)]
-    return K.stack(mat_n)
+class mfcc_kernel_init(Initializer):
+#     def __init__(self):
+        
+    def __call__(self, shape, dtype=K.floatx()):
+        self.shape = shape
+        (kernel_size,in_channels,out_channels) = shape
+        if(in_channels!=out_channels):
+            raise ValueError("Input and Output Channels must be same. Got {0} input channels and {0} output channels".format(in_channels,out_channels))
+        mat = K.eye(in_channels,dtype=dtype)
+        mat_n = [mat for i in range(kernel_size)]
+        return K.stack(mat_n)
+    def get_config(self):
+        return {
+            "shape":self.shape
+        }
 class Freq_Init(Initializer):
     def __init__(self, minf=0., maxf=500):
         self.minf = minf
@@ -86,10 +94,17 @@ def mel2hz(mel):
     return 700*(10**(mel/2595.0)-1)
 def erb(f):
     return 24.7*(4.37*10**-3*f+1)
-def beta_init(shape, dtype=K.floatx()):
-    (kernel_size,in_channels) = shape
-    beta_weights = tf.convert_to_tensor(np.ones((kernel_size,1))*100,dtype=K.floatx())
-    return beta_weights
+class beta_init(Initializer):
+    def __init__(self, val = 100):
+        self.val = val
+    def __call__(self,shape,dtype=K.floatx()):
+        (kernel_size,in_channels) = shape
+        beta_weights = tf.convert_to_tensor(np.ones((kernel_size,1))*self.val,dtype=K.floatx())
+        return beta_weights
+    def get_config(self):
+        return {
+            'val': self.val
+        }
 
 
 def expand(x):
@@ -265,15 +280,15 @@ def heartnet(kernel_size=5,fs=1000,winlen=0.025,winstep=0.01,filters=26,random_s
            l2_reg=0.0,l2_reg_dense=0.0,bn_momentum=0.99,dropout_rate=0.5,dropout_dense=0.0,eps = 1.1e-5,maxnorm=10000,
            activation_function='relu'):
     input = Input(shape=(2500, 1))
-    t = Conv1D_gammatone(kernel_size=81, strides=1,filters=filters,
+    t = Conv1D_gammatone(kernel_size=81,strides=1,filters=filters,
                          fsHz=fs,use_bias=False,padding='same',
                          fc_initializer=Freq_Init(minf=50.0,maxf=fs/2),
                          amp_initializer=initializers.constant(10**4),
-                        beta_initializer=beta_init,name="gamma"
+                        beta_initializer=beta_init(val=100),name="gamma"
                         )(input)
     t = BatchNormalization(epsilon=eps, momentum=bn_momentum, axis=-1)(t)
     t = MFCC(rank = 1,filters=filters,kernel_size=int(winlen*fs),output_format='signal',strides=int(winstep*fs),
-              kernel_initializer = mfcc_kernel_init, name="mfcc")(t)
+              kernel_initializer = mfcc_kernel_init(), name="mfcc")(t)
     t = BatchNormalization(epsilon=eps, momentum=bn_momentum, axis=-1)(t)
     
     t = branch(t,num_filt,kernel_size,random_seed,padding,bias,maxnorm,l2_reg,
@@ -309,11 +324,11 @@ def heartnet2D(kernel_size=5,fs=1000,winlen=0.025,winstep=0.01,filters=26,random
                          fsHz=fs,use_bias=False,padding='same',
                          fc_initializer=Freq_Init(minf=50.0,maxf=fs/2),
                          amp_initializer=initializers.constant(10**4),
-                        beta_initializer=beta_init,name="gamma"
+                        beta_initializer=beta_init(val=100),name="gamma"
                         )(input)
     t = BatchNormalization(epsilon=eps, momentum=bn_momentum, axis=-1)(t)
     t = MFCC(rank = 1,filters=filters,kernel_size=int(winlen*fs),output_format='signal',strides=int(winstep*fs),
-              kernel_initializer = mfcc_kernel_init, name="mfcc")(t)
+              kernel_initializer = mfcc_kernel_init(), name="mfcc")(t)
     # t = Lambda(expand,output_shape=expand_output_shape)(t)
     t = BatchNormalization(epsilon=eps, momentum=bn_momentum, axis=-1)(t)
     t = Reshape(target_shape=(-1,filters,1))(t)
@@ -467,7 +482,9 @@ class MFCC(Layer):
             'strides': self.strides,
             'padding': self.padding,
             'data_format': self.data_format,
-            'output_format':self.output_format
+            'output_format':self.output_format,
+            'kernel_initializer' : initializers.serialize(self.kernel_initializer)
         }
-        base_config = super(_Conv, self).get_config()
+        base_config = super(MFCC, self).get_config()
         return dict(list(base_config.items()) + list(config.items()))
+
