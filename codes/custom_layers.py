@@ -697,7 +697,7 @@ class Conv1D_gammatone(Layer):
     def __init__(self, filters=1, kernel_size=80, rank=1, strides=1, padding='valid',
                  data_format='channels_last', dilation_rate=1, activation=None, use_bias=True,
                  fsHz=1000.,
-                 fc_initializer=initializers.RandomUniform(minval=10, maxval=400),
+                 fc_initializer=initializers.RandomUniform(minval=10, maxval=4000),
                  n_order_initializer=initializers.constant(4.),
                  amp_initializer=initializers.constant(10 ** 5),
                  beta_initializer=initializers.RandomNormal(mean=30, stddev=6),
@@ -743,7 +743,7 @@ class Conv1D_gammatone(Layer):
                                   name='fc')
         self.n_order = self.add_weight(shape=(1, 1),
                                        initializer=self.n_order_initializer,
-                                       name='n')
+                                       name='n',trainable=False)
         self.amp = self.add_weight(shape=(self.filters, 1),
                                    initializer=self.amp_initializer,
                                    name='a')
@@ -841,11 +841,13 @@ class Conv1D_gammatone(Layer):
             'activation': activations.serialize(self.activation),
             'use_bias': self.use_bias,
             'fsHz': self.fsHz,
+#             'fc':tf.Session().run(self.fc),
             'fc_initializer': initializers.serialize(self.fc_initializer),
             'n_order_initializer': initializers.serialize(self.n_order_initializer),
             'amp_initializer': initializers.serialize(self.amp_initializer),
             'beta_initializer': initializers.serialize(self.beta_initializer),
             'bias_initializer': initializers.serialize(self.bias_initializer),
+#             'gammatone': self.impulse_gammatone()
         }
         base_config = super(Conv1D_gammatone, self).get_config()
         return dict(list(base_config.items()) + list(config.items()))
