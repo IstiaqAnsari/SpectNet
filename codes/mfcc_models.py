@@ -25,27 +25,41 @@ class GradReverse(torch.autograd.Function):
 
 class Network(nn.Module):
 
-	def __init__(self,num_class, domain_class):
-	    super(Network, self).__init__()
-	    self.extractor = Extractor()
-	    self.classifier = Class_classifier(num_class=num_class)
-	    self.domain = Domain_classifier(domain_class=domain_class)
-	            
-	def forward(self, x, hp_lambda=0):
-	    x = self.extractor(x)
-	    clss = self.classifier(x)
-	    dom = self.domain(x,hp_lambda)
-	    return clss,dom
+    def __init__(self,num_class, domain_class,data_format = "time_freq"):
+        super(Network, self).__init__()
+        self.num_class = num_class
+        self.domain_class = domain_class
+        self.data_format = data_format
+        self.extractor = Extractor(self.data_format)
+        self.classifier = Class_classifier(num_class=num_class,in_feature=38912)
+        self.domain = Domain_classifier(domain_class=domain_class)
+            
+    def forward(self, x, hp_lambda=0):
+        x = self.extractor(x)
+        clss = self.classifier(x)
+        
+        if(self.domain_class>0):
+            dom = self.domain(x,hp_lambda)
+            return clss,dom
+        return clss
 
 class Extractor(nn.Module):
 
-    def __init__(self):
+    def __init__(self,data_format):
+
+        self.data_format = data_format
+        if(self.data_format=="time_freq"):
+            self.form = True
+        else:
+            #"freq_time"
+            self.form = False
+
         super(Extractor, self).__init__()
-        self.conv0 = nn.Conv2d(1, 16, kernel_size=(3,2),stride=1)   ## change with input shape
+        self.conv0 = nn.Conv2d(1, 16, kernel_size= ((3,2) if(self.form) else (2,3)) ,stride=1)   ## change with input shape
         self.bn0 = nn.BatchNorm2d(16)
         
         # Res block 1
-        self.conv1 = nn.Conv2d(16, 32, kernel_size=3)
+        self.conv1 = nn.Conv2d(16, 32, kernel_size=(3,3))
         self.bn1 = nn.BatchNorm2d(32)
         self.conv11 = nn.Conv2d(32, 32, kernel_size=(3,3),stride=(1,1),padding=(2,2))
         self.bn11 = nn.BatchNorm2d(32)
@@ -55,16 +69,27 @@ class Extractor(nn.Module):
         self.bn2 = nn.BatchNorm2d(64)
         self.conv21 = nn.Conv2d(64, 64, kernel_size=(3,3), stride=(2,2),padding=(1,1))
         self.bn21 = nn.BatchNorm2d(64)
+
+        # Res block 3
+        self.conv3 = nn.Conv2d(64, 128, kernel_size=(3,3), stride=(1,1),padding=(1,1))
+        self.bn3 = nn.BatchNorm2d(128)
+        self.conv31 = nn.Conv2d(128, 128, kernel_size=(3,3), stride=(2,2),padding=(1,1),dilation=((2,1) if(self.form) else (1,2)))
+        self.bn31 = nn.BatchNorm2d(128)
+
+        # Res block 4
+        self.conv4 = nn.Conv2d(128, 256, kernel_size=(3,3), stride=(1,1),padding=(1,1))
+        self.bn4 = nn.BatchNorm2d(256)
+        self.conv41 = nn.Conv2d(256, 256, kernel_size=(3,3), stride=(2,2),padding=(1,1))
+        self.bn41 = nn.BatchNorm2d(256)
         
-        self.conv3 = nn.Conv2d(64, 64, kernel_size=(5,3), stride=(2,1),padding=(1,1)) ### change with input shape
-        self.bn3 = nn.BatchNorm2d(64)
+        self.conv5 = nn.Conv2d(256, 256, kernel_size=((5,3) if(self.form) else (3,5)), stride=((2,1) if(self.form) else (1,2)),padding=(1,1)) ### change with input shape
+        self.bn5 = nn.BatchNorm2d(256)
         
         self.drop = nn.Dropout2d(0.5)
         
         
     def forward(self, x):
         x = F.relu(self.bn0(self.conv0(x)))
-        
         #Res block 1
         x1 = self.drop(F.relu(self.bn1(self.conv1(x))))
         x1 = F.relu(F.max_pool2d(self.drop(self.bn11(self.conv11(x1))), 2))
@@ -72,18 +97,39 @@ class Extractor(nn.Module):
         x = F.max_pool2d(x,2)
         x = x+x1
         
+        
         #Res block 2
+        print(x.shape)
         x1 = self.drop(F.relu(self.bn2(self.conv2(x))))
+        print(x1.shape)
         x1 = F.relu(self.drop(self.bn21(self.conv21(x1))))
+        print(x1.shape)
         x = torch.cat((x,torch.zeros_like(x)), axis=1)
-        x = F.max_pool2d(x,2)        
+        x = F.max_pool2d(x,2)
+        print(x.shape)
+        x = x+x1
+        #Res block 3
+        x1 = self.drop(F.relu(self.bn3(self.conv3(x))))
+        x1 = F.relu(self.drop(self.bn31(self.conv31(x1))))
+        x = torch.cat((x,torch.zeros_like(x)), axis=1)
+        x = F.max_pool2d(x,2)
+        x = x+x1
+        #Res block 4
+        x1 = self.drop(F.relu(self.bn4(self.conv4(x))))
+        print(x1.shape)
+        x1 = F.relu(self.drop(self.bn41(self.conv41(x1))))
+        print(x1.shape)
+        x = torch.cat((x,torch.zeros_like(x)), axis=1)
+        x = F.max_pool2d(x,2)
+        print(x.shape,x1.shape)
         x = x+x1
         
         #last conv
-        x = self.drop(F.relu(self.bn3(self.conv3(x))))
-        x = F.max_pool2d(x,(2,1))  ### change withinput
-        x = x.view(-1, 64*3*15)
-        
+        x = self.drop(F.relu(self.bn5(self.conv5(x))))
+        x = F.max_pool2d(x,((2,1) if(self.form) else (1,2)))  ### change withinput
+        print(x.shape)
+        x = x.view(x.size(0),-1)
+        print(x.shape)        
         return x
 
 class Class_classifier(nn.Module):
