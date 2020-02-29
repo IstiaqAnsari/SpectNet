@@ -27,7 +27,7 @@ from keras.engine.topology import InputSpec
 import tensorflow as tf,keras
 from keras.layers.merge import Concatenate
 from keras.utils import conv_utils
-from keras.layers import Input, MaxPooling1D ,Conv1D,Activation,Dense, activations, initializers,Conv2D
+from keras.layers import Input, MaxPooling1D ,Conv1D,Activation,Dense,Conv2D
 from keras.layers import Flatten, regularizers, constraints,Dropout,Multiply
 from keras.layers.normalization import BatchNormalization
 from keras.optimizers import Adam, SGD
@@ -47,7 +47,7 @@ from keras.engine.topology import Layer
 from keras.engine.topology import InputSpec
 import tensorflow as tf
 from keras.utils import conv_utils
-from keras.layers import activations, initializers, regularizers, constraints
+from keras.layers import  initializers, regularizers, constraints
 import numpy as np
 from scipy.fftpack import dct
 from keras.backend.common import normalize_data_format
@@ -282,7 +282,7 @@ def heartnet(kernel_size=5,fs=1000,winlen=0.025,winstep=0.01,filters=26,random_s
     input = Input(shape=(2500, 1))
     t = Conv1D_gammatone(kernel_size=81,strides=1,filters=filters,
                          fsHz=fs,use_bias=False,padding='same',
-                         fc_initializer=Freq_Init(minf=50.0,maxf=fs/2),
+                         fc_initializer=Freq_Init(minf=0.0,maxf=fs/2),
                          amp_initializer=initializers.constant(10**4),
                         beta_initializer=beta_init(val=100),name="gamma"
                         )(input)
@@ -319,18 +319,20 @@ def heartnet2D(kernel_size=5,fs=1000,winlen=0.025,winstep=0.01,filters=26,random
            lr=0.0012843784,lr_decay=0.0001132885,subsam=2,num_filt=(16,32),num_dense=20,trainable=True,batch_size=1024,
            l2_reg=0.0,l2_reg_dense=0.0,bn_momentum=0.99,dropout_rate=0.5,dropout_dense=0.0,eps = 1.1e-5,maxnorm=10000,
            activation_function='relu'):
-    input = Input(shape=(2500, 1))
+    input = Input(shape=(42701, 1))
     t = Conv1D_gammatone(kernel_size=81,strides=1,filters=filters,
                          fsHz=fs,use_bias=False,padding='same',
-                         fc_initializer=Freq_Init(minf=50.0,maxf=fs/2),
+                         fc_initializer=Freq_Init(minf=0.0,maxf=fs/2),
                          amp_initializer=initializers.constant(10**4),
                         beta_initializer=beta_init(val=100),name="gamma"
                         )(input)
+    gamma = t
     t = BatchNormalization(epsilon=eps, momentum=bn_momentum, axis=-1)(t)
     t = MFCC(rank = 1,filters=filters,kernel_size=int(winlen*fs),output_format='signal',strides=int(winstep*fs),
               kernel_initializer = mfcc_kernel_init(), name="mfcc")(t)
     # t = Lambda(expand,output_shape=expand_output_shape)(t)
     t = BatchNormalization(epsilon=eps, momentum=bn_momentum, axis=-1)(t)
+    mfcc = t
     t = Reshape(target_shape=(-1,filters,1))(t)
 
     t = Conv2D(32, kernel_size=kernel_size,
@@ -340,6 +342,7 @@ def heartnet2D(kernel_size=5,fs=1000,winlen=0.025,winstep=0.01,filters=26,random
                 kernel_constraint=max_norm(maxnorm),
                 trainable=trainable,
                 kernel_regularizer=l2(l2_reg))(t)
+
     # t = BatchNormalization(epsilon=eps, momentum=bn_momentum, axis=-1)(t)
     # t = Activation(activation_function)(t)
     # t = Dropout(rate=dropout_rate, seed=random_seed)(t)
@@ -375,7 +378,7 @@ def heartnet2D(kernel_size=5,fs=1000,winlen=0.025,winstep=0.01,filters=26,random
     t = Dense(2, activation='softmax', name="class")(t)
     opt = Adam(lr=.001,decay=.001,epsilon=eps)
     
-    model = Model(inputs=input, outputs=t)
+    model = Model(inputs=input, outputs=[t,gamma,mfcc])
     model.compile(optimizer=opt, loss='categorical_crossentropy', metrics=['accuracy'])
     
     return model
