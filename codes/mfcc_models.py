@@ -31,8 +31,9 @@ class Network(nn.Module):
         self.domain_class = domain_class
         self.data_format = data_format
         self.extractor = Extractor(self.data_format)
-        self.classifier = Class_classifier(num_class=num_class,in_feature=38912)
-        self.domain = Domain_classifier(domain_class=domain_class)
+        self.classifier = Class_classifier(num_class=num_class,in_feature=int(7168))
+        if(self.domain_class>0):
+            self.domain = Domain_classifier(domain_class=domain_class)
             
     def forward(self, x, hp_lambda=0):
         x = self.extractor(x)
@@ -55,7 +56,7 @@ class Extractor(nn.Module):
             self.form = False
 
         super(Extractor, self).__init__()
-        self.conv0 = nn.Conv2d(1, 16, kernel_size= ((3,2) if(self.form) else (2,3)) ,stride=1)   ## change with input shape
+        self.conv0 = nn.Conv2d(1, 16, kernel_size= ((3,2) if(self.form) else (2,3)) ,stride=1,padding=((3,1) if(self.form) else (1,3)) )   ## change with input shape
         self.bn0 = nn.BatchNorm2d(16)
         
         # Res block 1
@@ -82,8 +83,8 @@ class Extractor(nn.Module):
         self.conv41 = nn.Conv2d(256, 256, kernel_size=(3,3), stride=(2,2),padding=(1,1))
         self.bn41 = nn.BatchNorm2d(256)
         
-        self.conv5 = nn.Conv2d(256, 256, kernel_size=((5,3) if(self.form) else (3,5)), stride=((2,1) if(self.form) else (1,2)),padding=(1,1)) ### change with input shape
-        self.bn5 = nn.BatchNorm2d(256)
+        # self.conv5 = nn.Conv2d(256, 256, kernel_size=((5,3) if(self.form) else (3,5)), stride=((2,1) if(self.form) else (1,2)),padding=(1,1)) ### change with input shape
+        # self.bn5 = nn.BatchNorm2d(256)
         
         self.drop = nn.Dropout2d(0.5)
         
@@ -99,14 +100,10 @@ class Extractor(nn.Module):
         
         
         #Res block 2
-        print(x.shape)
         x1 = self.drop(F.relu(self.bn2(self.conv2(x))))
-        print(x1.shape)
         x1 = F.relu(self.drop(self.bn21(self.conv21(x1))))
-        print(x1.shape)
         x = torch.cat((x,torch.zeros_like(x)), axis=1)
         x = F.max_pool2d(x,2)
-        print(x.shape)
         x = x+x1
         #Res block 3
         x1 = self.drop(F.relu(self.bn3(self.conv3(x))))
@@ -116,20 +113,15 @@ class Extractor(nn.Module):
         x = x+x1
         #Res block 4
         x1 = self.drop(F.relu(self.bn4(self.conv4(x))))
-        print(x1.shape)
         x1 = F.relu(self.drop(self.bn41(self.conv41(x1))))
-        print(x1.shape)
         x = torch.cat((x,torch.zeros_like(x)), axis=1)
         x = F.max_pool2d(x,2)
-        print(x.shape,x1.shape)
         x = x+x1
         
         #last conv
-        x = self.drop(F.relu(self.bn5(self.conv5(x))))
+        # x = self.drop(F.relu(self.bn5(self.conv5(x))))
         x = F.max_pool2d(x,((2,1) if(self.form) else (1,2)))  ### change withinput
-        print(x.shape)
         x = x.view(x.size(0),-1)
-        print(x.shape)        
         return x
 
 class Class_classifier(nn.Module):
