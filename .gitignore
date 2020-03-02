@@ -1,2 +1,11 @@
 
 data/fold0_noFIR.mat
+data/all_fold_wavename/compare.mat
+data/all_fold_wavename/fold_a.mat
+data/all_fold_wavename/fold_b.mat
+data/all_fold_wavename/fold_c.mat
+data/all_fold_wavename/fold_d.mat
+data/all_fold_wavename/fold_e.mat
+data/all_fold_wavename/fold_f.mat
+data/all_fold_wavename/pascalA.mat
+data/all_fold_wavename/pascalB.mat

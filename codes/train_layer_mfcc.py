@@ -60,10 +60,15 @@ y_val = y_val.transpose()
 y_val = y_val[:,0]
 y_val[y_val<0] = 0
 
-batch_size = 500
+batch_size = 100
 datagen_source = BalancedAudioDataGenerator(shift=.1,data_format = 'channels_first')
 flow_source = datagen_source.flow(x_train, y_train,
                 meta_label=y_train,
+                batch_size=batch_size, shuffle=True,
+                seed=1)
+datagen_val = BalancedAudioDataGenerator(shift=.1,data_format = 'channels_first')
+flow_val = datagen_val.flow(x_val, y_val,
+                meta_label=y_val,
                 batch_size=batch_size, shuffle=True,
                 seed=1)
 
@@ -152,6 +157,8 @@ for e in range(epochs):
     print("EPOCH   ",e+1)
     model.train()
     epoch_loss = 0
+    acc = 0
+    N = 0
     for i in range(flow_source.steps_per_epoch+1):
         
         optimizer.zero_grad()
@@ -162,27 +169,45 @@ for e in range(epochs):
         x = mfcc_gen(x)
         x = x.transpose(2,1)
         x = x.unsqueeze(1)
-        print(x.shape)
+        # print(x.shape)
         x,y = Variable(x),Variable(y)
         
         y = y.long().cuda()        
         cls = model(x)
-        class_loss = class_criterion(cls,torch.argmax(y,axis=1))        
+        # class_loss = class_criterion(cls,torch.argmax(y,axis=1))        
+        class_loss = class_criterion(cls,y)
         loss = class_loss
         epoch_loss = epoch_loss + loss
+        acc = acc + torch.sum(y==torch.argmax(cls,axis=1))
+        N = N+len(y)
         loss.backward()
         optimizer.step()
-    print("Training loss fo", "%.2f"%(epoch_loss.item()/flow_source.steps_per_epoch),end=' ')
+    print("Training loss", "%.2f"%(epoch_loss.item()/flow_source.steps_per_epoch),end=' ')
+    print("Training Acc ", "%.2f"%(acc/N).item(),end=' ')
     # Validate 
     model.eval()
+    epoch_loss = 0
+    acc = 0
+    N = 0
     with torch.no_grad():
-        x,y = torch.from_numpy(x_val),torch.from_numpy(y_val)
-        x,y = Variable(x),Variable(y)
-        x = x.type(torch.FloatTensor).cuda()
-        #x = x.reshape(x.shape[0],1,x.shape[1],x.shape[2])
-        y = y.long().cuda()
-        cls= model(x)
-        val_class_loss = class_criterion(cls,torch.argmax(y,axis=1))
-        print("val_Class_loss  ","%.2f"%val_class_loss.item())
-        log_macc(cls,y,val_parts)
+        for i in range(flow_val.steps_per_epoch+1):
+            x,y = flow_source.next()
+            x,y = torch.from_numpy(x),torch.from_numpy(y)
+            x = x.type(torch.FloatTensor).cuda()
+            x = mfcc_gen(x)
+            x = x.transpose(2,1)
+            x = x.unsqueeze(1)
+            x,y = Variable(x),Variable(y)
+            #x = x.reshape(x.shape[0],1,x.shape[1],x.shape[2])
+            y = y.long().cuda()
+            cls= model(x)
+            # val_class_loss = class_criterion(cls,torch.argmax(y,axis=1))
+            val_class_loss = class_criterion(cls,y)
+            acc = acc + torch.sum(y==torch.argmax(cls,axis=1))
+            N = N+len(y)
+            epoch_loss = epoch_loss + val_class_loss
+            # log_macc(cls,y,val_parts)
+        print("Validation loss", "%.2f"%(epoch_loss.item()/flow_val.steps_per_epoch),end=' ')
+        print("Validation Acc ", "%.2f"%(acc/N).item(),end=' ')
+    flow_val.reset()
     flow_source.reset()
