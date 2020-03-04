@@ -114,11 +114,12 @@ class ResultsComparison():
         if(logs_dann is not None):
             self.log_dir_dann = '../../Heartnet_Results/logs/dann/'
         self.log_dir = '../../Heartnet_Results/logs/'
-        self.metrics = ['val_macc','val_F1','precision','sensitivity','specificity']
+        self.metrics = ['macc','F1','precision','sensitivity','specificity']
         self.logs = logs
         self.logs_dann = logs_dann
         self.data = []
         self.read()
+        self.baseline = pd.read_csv('../miscellaneous/baseline_results.csv')
     def read(self):
         self.data = [Result(l) for l in self.logs]
         if(self.logs_dann is not None):
@@ -137,7 +138,8 @@ class ResultsComparison():
             #self.autolabel(rect1,ax)
         ax.set_xticks(x)
         ax.set_title("Orre kop ")
-        ax.set_xticklabels(self.metrics)
+       
+        ax.set_xticklabels(self.data[0].df.keys())
         ax.legend()
         fig.tight_layout()
         plt.show()
