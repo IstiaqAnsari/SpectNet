@@ -10,14 +10,14 @@ def plotf(x):
 
 
 class MFCC_Gen(nn.Module):
-    def __init__(self,kernel_size = 81,filters = 26,fs=1000,winlen=0.025,winstep=0.01,dimension=1):
+    def __init__(self,kernel_size = 81,filters = 26,fs=1000,winlen=0.025,winstep=0.01,dimension=1,momentum=0.99):
         super(MFCC_Gen,self).__init__()
         self.gamma = Conv_Gammatone(in_channels=1,out_channels=filters ,kernel_size=kernel_size,fsHz=fs)
 #         self.gamma = nn.Conv1d(in_channels=1,out_channels=filters ,kernel_size=81,stride=1)
-        self.gammanorm = nn.BatchNorm1d(filters)
+        self.gammanorm = nn.BatchNorm1d(filters,momentum=momentum)
         self.mfcc = nn.Conv1d(filters,filters,int(winlen*fs),stride=int(winstep*fs),padding=0,bias=False)
-        self.normmfcc = nn.BatchNorm1d(filters)
-        self.normmfcc2D = nn.BatchNorm2d(1)
+        self.normmfcc = nn.BatchNorm1d(filters,momentum=momentum)
+        self.normmfcc2D = nn.BatchNorm2d(1,momentum=momentum)
         with torch.no_grad():
             self.mfcc.weight = Parameter(torch.stack([torch.eye(filters) for i in range(int(winlen*fs))],dim=2))
         for x in self.mfcc.named_parameters():
@@ -26,11 +26,12 @@ class MFCC_Gen(nn.Module):
             x[1].requires_grad = False
     def forward(self,x):
         x = self.gamma(x)
-        x = self.gammanorm(x)
+        # x = self.gammanorm(x)
         x = torch.pow(torch.abs(x),2)
         x = self.mfcc(x)
         x = torch.log(x+0.0000000000000001)
-        x = self.normmfcc(x)
+        x = x.unsqueeze(1)
+        x = self.normmfcc2D(x)
         return x
 
 
