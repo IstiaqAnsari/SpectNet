@@ -26,14 +26,15 @@ class MFCC_Gen(nn.Module):
             x[1].requires_grad = False
     def forward(self,x):
         x = self.gamma(x)
-        # x = self.gammanorm(x)
+        gm = x
+        x = self.gammanorm(x)
+        gmnorm = x
         x = torch.pow(torch.abs(x),2)
         x = self.mfcc(x)
         x = torch.log(x+0.0000000000000001)
-        x = x.unsqueeze(1)
-        x = self.normmfcc2D(x)
-        return x
-
+        # x = x.unsqueeze(1)
+        x = self.normmfcc(x)
+        return x,gm,gmnorm
 
 from torch.nn.parameter import Parameter
 from torch.nn.modules.utils import _single

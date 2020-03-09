@@ -23,3 +23,10 @@ python trainer.py gh --epochs 400 --dann 0.01;python trainer.py i --epochs 400 -
 ,,,,
 ,,,,
 check the data length of diffaerent folds . may be 2500 values have different length of zeros for different folds,,,,
+
+
+
+
+
+Model only outputs [1,0] 
+whatever the input is 
