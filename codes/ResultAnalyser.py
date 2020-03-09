@@ -89,20 +89,13 @@ class Result():
 class ResultsComparison():
     def __init__(self,logs,logs_dann=None):
         if(logs_dann is not None):
-<<<<<<< HEAD
-            self.log_dir_dann = '../../Heartnet_Results/logs/dann/'
-        self.log_dir = '../../Heartnet_Results/logs/'
-        self.metrics = ['macc','F1','precision','sensitivity','specificity']
-=======
             self.log_dir_dann = '../../Adversarial Heart Sound Results/logs/dann/'
         self.log_dir = '../../Adversarial Heart Sound Results/logs/'
         self.metrics = ['val_macc','val_F1','val_precision','val_sensitivity','val_specificity']
->>>>>>> parent of 51edc1c... result showing edited  key.
         self.logs = logs
         self.logs_dann = logs_dann
         self.data = []
         self.read()
-        self.baseline = pd.read_csv('../miscellaneous/baseline_results.csv')
     def read(self):
         self.data = [Result(l) for l in self.logs]
         if(self.logs_dann is not None):
@@ -125,14 +118,8 @@ class ResultsComparison():
             #self.autolabel(rect1,ax)
         print(macc_avg/plot_number)
         ax.set_xticks(x)
-<<<<<<< HEAD
-        ax.set_title("Orre kop ")
-       
-        ax.set_xticklabels(self.data[0].df.keys())
-=======
         ax.set_title("Results Comparison")
         ax.set_xticklabels(self.metrics)
->>>>>>> parent of 51edc1c... result showing edited  key.
         ax.legend()
         fig.tight_layout()
         if(shownow):

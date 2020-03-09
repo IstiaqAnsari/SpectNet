@@ -36,7 +36,7 @@ class CSVLogger():
 
     def __init__(self, filename, separator=',', append=False):
         self.sep = separator
-        self.switch = True
+        
         if(filename[-4:]=='.csv'):
         	self.filename = filename
         else:
@@ -53,11 +53,8 @@ class CSVLogger():
             self.file_flags = ''
             self._open_args = {'newline': '\n'}
         super(CSVLogger, self).__init__()
-    def on_off(self,k):
-        self.switch = k
+
     def on_train_begin(self, logs=None):
-        if(not self.switch):
-            return
         if self.append:
             if os.path.exists(self.filename):
                 with open(self.filename, 'r' + self.file_flags) as f:
@@ -70,8 +67,6 @@ class CSVLogger():
                                 **self._open_args)
 
     def on_epoch_end(self, epoch, logs=None):
-        if(not self.switch):
-            return
         logs = self.logs
 
         def handle_value(k):
@@ -108,8 +103,6 @@ class CSVLogger():
         self.csv_file.flush()
 
     def on_train_end(self, logs=None):
-        if(not self.switch):
-            return
         self.csv_file.close()
         self.writer = None
 
