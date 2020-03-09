@@ -43,7 +43,7 @@ def refreshList():
     dirs.clear()
     tex.delete('1.0', END)
     
-
+    
 def lossplot(filepath,fig=None,ax=None,figsize=(8,5),limy=None,params = [],plots = []):
     
     filepath = os.path.join(filepath,'training.csv')
@@ -52,9 +52,8 @@ def lossplot(filepath,fig=None,ax=None,figsize=(8,5),limy=None,params = [],plots
         df.sort_values(by='epoch',ascending=True,inplace = True)
         if(fig==None):
             fig, ax = plt.subplots(figsize=figsize)
-        losses = [x for x in df.keys() if('loss' in x)]
-        for x in losses:
-            ax.plot(np.array(df[x]),label=x)
+        ax.plot(df['class_loss'],label='Training Class Loss')
+        ax.plot(df['val_class_loss'],label='Validation Class Loss')
         for x in plots:
             ax.plot(df[x],label=x)
         ax.set_xlabel('Epochs',fontdict={'size':12})
@@ -63,7 +62,18 @@ def lossplot(filepath,fig=None,ax=None,figsize=(8,5),limy=None,params = [],plots
             x1,x2,y1,y2 = plt.axis()
             ax.axis((x1,x2,limy[0],limy[1]))
         plt.show()
-        
+        print(filepath)
+        df.sort_values(by='val_macc',ascending=False,inplace = True)
+        print('epoch ', df.iloc[0]['epoch'])
+        print('max macc',(df.iloc[0]['val_macc']))
+        print('train acc', (df.iloc[0]['class_acc']))
+        print('val acc', (df.iloc[0]['val_class_acc']))
+        print('val_F1',(df.iloc[0]['val_F1']))
+        print('val_sensitivity', (df.iloc[0]['val_sensitivity']))
+        print('val_specificity', (df.iloc[0]['val_specificity']))
+        print('val_precision', (df.iloc[0]['val_precision']))
+        for x in params:
+            print(x,(df.iloc[0][x]))
     else:
         print("NO csv file found")
 

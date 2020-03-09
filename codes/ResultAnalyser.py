@@ -6,7 +6,7 @@ class Results():
         self.df = None
         self.dft = None # Tuned result
         self.tune = False
-        self.log_dir = '../../Heartnet_Results/logs/'
+        self.log_dir = '../../Adversarial Heart Sound Results/logs/'
         self.metrics = ['val_macc','val_F1','val_precision','val_sensitivity','val_specificity']
         self.read()
     def read(self):
@@ -17,20 +17,12 @@ class Results():
         now.sort()
         print("Log not tuned " ,wow[how.index(now[0])])
         self.df = pd.read_csv(self.log_dir+wow[how.index(now[0])]+'/training.csv')
-        self.macc = None
-        self.f1 = None
-        for x in self.df.keys():
-            if('macc' in x):
-                self.macc = x
-            if('F1' in x):
-                self.f1 = x
-        
-        self.df.sort_values(by=self.macc if(self.f1 is None) else [self.macc,self.f1],ascending=False,inplace = True)
+        self.df.sort_values(by=['val_macc','val_F1'],ascending=False,inplace = True)
         self.df = dict(self.df.iloc[0][self.metrics])
         if(len(now)>1):
             print("Tuned log ",wow[how.index(now[1])])
             self.dft = pd.read_csv(self.log_dir+wow[how.index(now[1])]+'/training.csv')
-            self.dft.sort_values(by=self.macc if(self.f1 is None) else [self.macc,self.f1],ascending=False,inplace = True)
+            self.dft.sort_values(by=['val_macc','val_F1'],ascending=False,inplace = True)
             self.dft = dict(self.dft.iloc[0][self.metrics])
             self.tune = True
     def show(self,width = 0.35,figsize=(8,5)):
@@ -69,9 +61,9 @@ class Result():
         #find is a bool, if true then the log name is searched using the log when the log is only the fold name
         # not the full path . result comparison calls it with the full path. so no need of find variable 
         # but must in model loading which is set in heartnet.getattentionModel
-        self.log_dir = '../../Heartnet_Results/logs/'
-        self.metrics = ['macc','F1','precision','sensitivity','specificity']
-        self.log_name = log.split(' ')[0].split('/')[-1]
+        self.log_dir = '../../Adversarial Heart Sound Results/logs/'
+        self.metrics = ['val_macc','val_F1','val_precision','val_sensitivity','val_specificity']
+        self.log_name = log.split(' ')[0]
         if(dann):
             self.log_dir = self.log_dir+'dann/'
             self.log_name = self.log_name + " dann"
@@ -90,31 +82,22 @@ class Result():
             self.df = pd.read_csv(log+'/training.csv')
         else:
             self.df = pd.read_csv(self.log_dir+log+'/training.csv')
-        self.macc = None
-        self.f1 = None
-        for x in self.df.keys():
-            if('macc' in x):
-                self.macc = x
-            if('F1' in x):
-                self.f1 = x
-        self.metdic = {}
-        for m in self.metrics:
-            for k in self.df.keys():
-                if(m in k):
-                    self.metdic[m] = k
-#         print(list(self.metdic.values()))
-        self.df.sort_values(by=self.macc if(self.f1 is None) else [self.macc,self.f1],ascending=False,inplace = True)
-#         print(self.df.iloc[0])
-        self.df = (self.df.iloc[0][list(self.metdic.values())])
-        print(self.df)
-#         self.df = dict(self.df.iloc[0]['val_macc'])
+        self.df.sort_values(by=['val_macc','val_F1'],ascending=False,inplace = True)
+        self.df = dict(self.df.iloc[0][self.metrics])
+
 ## Compare any number of result 
 class ResultsComparison():
     def __init__(self,logs,logs_dann=None):
         if(logs_dann is not None):
+<<<<<<< HEAD
             self.log_dir_dann = '../../Heartnet_Results/logs/dann/'
         self.log_dir = '../../Heartnet_Results/logs/'
         self.metrics = ['macc','F1','precision','sensitivity','specificity']
+=======
+            self.log_dir_dann = '../../Adversarial Heart Sound Results/logs/dann/'
+        self.log_dir = '../../Adversarial Heart Sound Results/logs/'
+        self.metrics = ['val_macc','val_F1','val_precision','val_sensitivity','val_specificity']
+>>>>>>> parent of 51edc1c... result showing edited  key.
         self.logs = logs
         self.logs_dann = logs_dann
         self.data = []
@@ -126,23 +109,34 @@ class ResultsComparison():
             self.data = self.data+[Result(l,True) for l in self.logs_dann]
     def show(self,fig=None,ax=None,width = 0.35,figsize=(8,5),shownow=True):
         x = np.arange(len(self.metrics))
+        print(x)
         if(fig==None):
             fig, ax = plt.subplots(figsize=figsize)
         plot_number = len(self.data)
         width = .8/plot_number
         idx = np.arange(-(plot_number-1)/2,(plot_number-1)/2+1,1)
+        macc_avg = 0
         for i,d in enumerate(self.data):
-            labels = list(d.df.values)
+            macc_avg = macc_avg + d.df['val_macc']
+            print(d.log_name)
+            labels = list(d.df.values())
             rect1 = ax.bar(x+idx[i]*width,labels,width,label=d.log_name)
             self.autolabel(rect1,ax)
             #self.autolabel(rect1,ax)
+        print(macc_avg/plot_number)
         ax.set_xticks(x)
+<<<<<<< HEAD
         ax.set_title("Orre kop ")
        
         ax.set_xticklabels(self.data[0].df.keys())
+=======
+        ax.set_title("Results Comparison")
+        ax.set_xticklabels(self.metrics)
+>>>>>>> parent of 51edc1c... result showing edited  key.
         ax.legend()
         fig.tight_layout()
-        plt.show()
+        if(shownow):
+            plt.show()
     def autolabel(self,rects,ax):
         for rect in rects:
             height = rect.get_height()
