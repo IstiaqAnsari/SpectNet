@@ -42,7 +42,7 @@ class Data():
         if(f[:3]=='com'):self.processCompare(severe) ### select severe files only
         else:
             self.trainY[self.trainY<0] = 0
-        if('fold_e' in f):self.processE()
+        # if('fold_e' in f):self.processE()
         if(shuffle is not None):self.shuffle_data(shuffle)
         if(split>0):self.split_data(split)
         #if(normalize):self.normalize_data()
