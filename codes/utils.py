@@ -19,7 +19,10 @@ class log_macc(Callback):
         self.val_parts = val_parts
         self.decision = decision
         self.verbose = verbose
-        self.val_files = np.asarray(val_files)
+        if(val_files is not None):
+            self.val_files = np.asarray(val_files)
+        else:
+            self.val_files = val_files
         self.wav_files = wav_files
         self.checkpoint_name = checkpoint_name
         print("Check point ", checkpoint_name)

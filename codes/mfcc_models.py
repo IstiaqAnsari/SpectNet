@@ -86,7 +86,7 @@ class Extractor(nn.Module):
         # self.conv5 = nn.Conv2d(256, 256, kernel_size=((5,3) if(self.form) else (3,5)), stride=((2,1) if(self.form) else (1,2)),padding=(1,1)) ### change with input shape
         # self.bn5 = nn.BatchNorm2d(256)
         
-        self.drop = nn.Dropout2d(0.5)
+        self.drop = nn.Dropout2d(0.0)
         
         
     def forward(self, x):

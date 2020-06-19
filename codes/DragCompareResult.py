@@ -59,9 +59,16 @@ def lossplot(filepath,fig=None,ax=None,figsize=(8,5),limy=None,params = [],plots
             ax.plot(df[x],label=x)
         ax.set_xlabel('Epochs',fontdict={'size':12})
         ax.legend()
+        
         if(limy is not None):
             x1,x2,y1,y2 = plt.axis()
             ax.axis((x1,x2,limy[0],limy[1]))
+        if(limy is None):
+            limy = (0,1)
+        major_ticks = np.arange(limy[0], limy[1],0.05)
+
+        ax.set_yticks(major_ticks)
+        ax.grid()
         plt.show()
         
     else:
