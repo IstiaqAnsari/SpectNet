@@ -340,15 +340,15 @@ class Network(nn.Module):
         self.extractor = Extractor(self.data_format)
         self.classifier = Class_classifier(num_class=num_class,in_feature=int(7168))
         if(self.domain_class>0):
-            self.domain = Domain_classifier(domain_class=domain_class)
+            self.domain = Domain_classifier(domain_class=domain_class,in_feature=int(7168))
             
     def forward(self, x, hp_lambda=0):
         x = self.extractor(x)
         clss = self.classifier(x)
         
-        # if(self.domain_class>0):
-        #     dom = self.domain(x,hp_lambda)
-        #     return clss,dom
+        if(self.domain_class>0):
+            dom = self.domain(x,hp_lambda)
+            return clss,dom
         return clss
 
 class Extractor(nn.Module):

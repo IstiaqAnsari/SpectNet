@@ -12,7 +12,7 @@ from keras import backend as K
 import tensorflow as tf
 from keras.utils import to_categorical
 
-class log_macc(Callback):
+class log_macc_default(Callback):
 
     def __init__(self, val_parts,decision='majority',verbose=0, val_files=None,checkpoint_name=None,wav_files=None):
         super(log_macc, self).__init__()
@@ -197,4 +197,69 @@ def Confused_Crossentropy(y_true, y_pred):
     #y_predfused = tf.convert_to_tensor((np.ones((batch,num_class),dtype=np.float32)*0.5))
     #y_truefused = tf.convert_to_tensor( to_categorical(np.ones(batch),num_class) )
     return K.abs(K.categorical_crossentropy(y_true, y_pred)-K.categorical_crossentropy(y_true,y_predfused))
+from sklearn.metrics import confusion_matrix
+eps = 0.0000001
+def log_macc(y_pred, y_val,val_parts):
+    y_pred = y_pred.cpu().detach().numpy()
+#     y_pred_domain = y_pred_domain.cpu().detach().numpy()
+    y_val = y_val.cpu().detach().numpy()
+    true = []
+    pred = []
+    files = []
+    start_idx = 0
 
+#     y_pred = np.argmax(y_pred, axis=-1)
+#     y_val = np.transpose(np.argmax(y_val, axis=-1))
+
+    for j,s in enumerate(val_parts):
+
+        if not s:  ## for e00032 in validation0 there was no cardiac cycle
+            continue
+        # ~ print "part {} start {} stop {}".format(s,start_idx,start_idx+int(s)-1)
+        
+        temp_ = y_val[start_idx:start_idx + int(s)]
+        temp = y_pred[start_idx:start_idx + int(s)]
+
+        if (sum(temp == 0) > sum(temp == 1)):
+            pred.append(0)
+        else:
+            pred.append(1)
+
+        if (sum(temp_ == 0) > sum(temp_ == 1)):
+            true.append(0)
+        else:
+            true.append(1)
+
+#         if val_files is not None:
+#             files.append(val_files[start_idx])
+
+        start_idx = start_idx + int(s)
+    TN, FP, FN, TP = confusion_matrix(true, pred, labels=[0,1]).ravel()
+    # TN = float(TN)
+    # TP = float(TP)
+    # FP = float(FP)
+    # FN = float(FN)
+    sensitivity = TP / (TP + FN + eps)
+    specificity = TN / (TN + FP + eps)
+    precision = TP / (TP + FP + eps)
+    F1 = 2 * (precision * sensitivity) / (precision + sensitivity + eps)
+    Macc = (sensitivity + specificity) / 2
+    
+    print("TN:",TN,"FP:",FP,"FN:",FN,"TP:",TP)
+    print("Sensitivity:","%.2f"%sensitivity,"Specificity:","%.2f"%specificity,"Precision:","%.2f"%precision,end=' ')
+    print("F1:", "%.2f"%F1,"MACC", "%.2f"%Macc)
+    return Macc,sensitivity,specificity,precision,F1
+def trainLog(y_true,y_pred):
+    eps = 0.0000001
+    y_pred = y_pred.cpu().detach().numpy()
+    y_true = y_true.cpu().detach().numpy()
+    TN, FP, FN, TP = confusion_matrix(y_true, y_pred, labels=[0,1]).ravel()
+    sensitivity = TP / (TP + FN + eps)
+    specificity = TN / (TN + FP + eps)
+    precision = TP / (TP + FP + eps)
+    F1 = 2 * (precision * sensitivity) / (precision + sensitivity + eps)
+    Macc = (sensitivity + specificity) / 2
+    print("TN:",TN,"FP:",FP,"FN:",FN,"TP:",TP)
+    print("Sensitivity:","%.2f"%sensitivity,"Specificity:","%.2f"%specificity,"Precision:","%.2f"%precision,end=' ')
+    print("F1:", "%.2f"%F1,"MACC", "%.2f"%Macc)
+    
