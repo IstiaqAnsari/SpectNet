@@ -197,6 +197,7 @@ def Confused_Crossentropy(y_true, y_pred):
     #y_predfused = tf.convert_to_tensor((np.ones((batch,num_class),dtype=np.float32)*0.5))
     #y_truefused = tf.convert_to_tensor( to_categorical(np.ones(batch),num_class) )
     return K.abs(K.categorical_crossentropy(y_true, y_pred)-K.categorical_crossentropy(y_true,y_predfused))
+
 from sklearn.metrics import confusion_matrix
 eps = 0.0000001
 def log_macc(y_pred, y_val,val_parts):

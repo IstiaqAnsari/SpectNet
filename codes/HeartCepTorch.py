@@ -20,28 +20,33 @@ class MFCC_Gen(nn.Module):
         self.normmfcc2D = nn.BatchNorm2d(1,momentum=momentum)
         with torch.no_grad():
             self.mfcc.weight = Parameter(torch.stack([torch.eye(filters) for i in range(int(winlen*fs))],dim=2))
-        for x in self.mfcc.named_parameters():
-            x[1].requires_grad = False
-        for x in self.gamma.named_parameters():
-            x[1].requires_grad = False
+#         for x in self.mfcc.named_parameters():
+#             x[1].requires_grad = False
+#         for x in self.gamma.named_parameters():
+#             x[1].requires_grad = False
     def forward(self,x):
         x = self.gamma(x)
         # gm = x
-        x = self.gammanorm(x)
+#         x = self.gammanorm(x)
         # gmnorm = x
         x = torch.pow(torch.abs(x),2)
         x = self.mfcc(x)
         x = torch.log(x+0.0000000000000001)
 #         x = x.unsqueeze(1)
-        x = self.normmfcc(x)
+#         x = self.normmfcc(x)
+        x = x.transpose(2,1)
+        x = x.unsqueeze(1)
+#         x = self.normmfcc2D(x)
+        
         return x#,gm,gmnorm
 
 class MFCC_Gen_coeff(nn.Module):
     def __init__(self,kernel_size = 81,filters = 26,fs=1000,winlen=0.025,winstep=0.01,dimension=1,momentum=0.99):
         super(MFCC_Gen_coeff,self).__init__()
-        self.gamma = nn.Conv1d(1,64,kernel_size=81)
+        self.gamma = nn.Conv1d(1,filters,kernel_size=81)
+#         print("Be carefull, Gammatone inactive")
         wow = Conv_Gammatone_coeff(in_channels=1,out_channels=filters ,kernel_size=kernel_size,fsHz=fs)
-        self.gamma.weight = wow.weight
+#         self.gamma.weight = wow.weight
         del wow
 #         self.gamma = nn.Conv1d(in_channels=1,out_channels=filters ,kernel_size=81,stride=1)
         self.gammanorm = nn.BatchNorm1d(filters,momentum=momentum)
@@ -50,10 +55,10 @@ class MFCC_Gen_coeff(nn.Module):
         self.normmfcc2D = nn.BatchNorm2d(1,momentum=momentum)
         with torch.no_grad():
             self.mfcc.weight = Parameter(torch.stack([torch.eye(filters) for i in range(int(winlen*fs))],dim=2))
-        for x in self.mfcc.named_parameters():
-            x[1].requires_grad = False
-        for x in self.gamma.named_parameters():
-            x[1].requires_grad = False
+#         for x in self.mfcc.named_parameters():
+#             x[1].requires_grad = False
+#         for x in self.gamma.named_parameters():
+#             x[1].requires_grad = False
     def forward(self,x):
         x = self.gamma(x)
         # gm = x
@@ -332,15 +337,16 @@ class GradReverse(torch.autograd.Function):
 
 class Network(nn.Module):
 
-    def __init__(self,num_class, domain_class,data_format = "time_freq"):
+    def __init__(self,num_class, domain_class,data_format = "time_freq",in_feature=7168,res_block=4):
         super(Network, self).__init__()
         self.num_class = num_class
         self.domain_class = domain_class
         self.data_format = data_format
-        self.extractor = Extractor(self.data_format)
-        self.classifier = Class_classifier(num_class=num_class,in_feature=int(7168))
+        self.res_block = res_block
+        self.extractor = Extractor(self.data_format,res_block=res_block)
+        self.classifier = Class_classifier(num_class=num_class,in_feature=int(in_feature))
         if(self.domain_class>0):
-            self.domain = Domain_classifier(domain_class=domain_class,in_feature=int(7168))
+            self.domain = Domain_classifier(domain_class=domain_class)
             
     def forward(self, x, hp_lambda=0):
         x = self.extractor(x)
@@ -353,7 +359,7 @@ class Network(nn.Module):
 
 class Extractor(nn.Module):
 
-    def __init__(self,data_format):
+    def __init__(self,data_format,res_block=4):
 
         self.data_format = data_format
         if(self.data_format=="time_freq"):
@@ -361,6 +367,8 @@ class Extractor(nn.Module):
         else:
             #"freq_time"
             self.form = False
+        self.res_block = res_block
+        print("Using only ", res_block," resudual blocks out of 4")
 
         super(Extractor, self).__init__()
         self.conv0 = nn.Conv2d(1, 16, kernel_size= ((3,2) if(self.form) else (2,3)) ,stride=1,padding=((3,1) if(self.form) else (1,3)) )   ## change with input shape
@@ -407,18 +415,32 @@ class Extractor(nn.Module):
         x = x+x1
         
         
+#         ###  debugging 
+#         x = F.max_pool2d(x,16)
+        
+#         return x.view(x.size(0),-1)
+#         ####  debugging
+    
+        
+        
         #Res block 2
         x1 = self.drop(F.relu(self.bn2(self.conv2(x))))
         x1 = F.relu(self.drop(self.bn21(self.conv21(x1))))
         x = torch.cat((x,torch.zeros_like(x)), axis=1)
         x = F.max_pool2d(x,2)
         x = x+x1
+        if(self.res_block<3):
+            return x.view(x.size(0),-1)
+        
+        
         #Res block 3
         x1 = self.drop(F.relu(self.bn3(self.conv3(x))))
         x1 = F.relu(self.drop(self.bn31(self.conv31(x1))))
         x = torch.cat((x,torch.zeros_like(x)), axis=1)
         x = F.max_pool2d(x,2)
         x = x+x1
+        if(self.res_block<4):
+            return x.view(x.size(0),-1)
         #Res block 4
         x1 = self.drop(F.relu(self.bn4(self.conv4(x))))
         x1 = F.relu(self.drop(self.bn41(self.conv41(x1))))
