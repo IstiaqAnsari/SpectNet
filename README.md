@@ -30,7 +30,7 @@ The layers can be found in [this](codes/HeartCepTorch.py). The MFCC_gen module g
 
 We use the **Physionet HeartSound Dataset** for experiments on Heart Sound signal. Data distribution are given below:
 |Subset | Total Subject | Normal recordings |Abnormal recordings|Used device|
-|-------|---------------|------------------|-----------------|---------------|
+|:-------:|:---------------:|:------------------:|:-----------------:|:---------------:|
 |a |121| 117| 292| Welch Allyn Meditron|
 |b| 106| 385| 104| 3M Littmann E4000|
 |c| 31| 7| 24| AUDIOSCOPE|
