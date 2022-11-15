@@ -10,3 +10,7 @@ data/all_fold_wavename/fold_f.mat
 data/all_fold_wavename/pascalA.mat
 data/all_fold_wavename/pascalB.mat
 *.mat
+codes/.ipynb_checkpoints/
+codes/.ipynb_checkpoints/*
+codes/__pycache__/
+codes/__pycache__/*
